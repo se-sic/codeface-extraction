@@ -1,10 +1,10 @@
 SET @proj = 'busybox';
 SET @tagging = 'feature';
-SET @rev = '1_14_0';
+SET @rev = '1_20_0';
 SET @entityType = 'Feature';
 
-
 SELECT pers.id AS id, pers.name AS name, cd.entityId AS artifact
+#SELECT c.commitHash, c.commitDate, cd.file, cd.entityId AS function, pers.name AS name
 
 FROM project p
 
@@ -37,7 +37,7 @@ AND p.analysisMethod = @tagging
 AND l2.tag = @rev
 AND cd.entityType = @entityType
 
-GROUP BY pers.name, cd.entityId ASC
-#ORDER BY pers.id DESC
+#GROUP BY cd.entityId ASC
+ORDER BY cd.entityId, pers.name ASC
 
-# LIMIT 10
+#LIMIT 7000
