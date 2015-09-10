@@ -3,7 +3,7 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ) # script dir
 SCRIPT="extraction/author2artifact.py" # the Python script to run: the extraction process
 
-CFDIR="/local/hunsen/codeface/codeface-repo" # root of Codeface repository
+#CFDIR="/home/hunsen/codeface/codeface-repo" # root of Codeface repository
 
 # construct proper PYTHONPATH for imports:
 # Codeface + everything else

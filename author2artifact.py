@@ -26,12 +26,12 @@ def __select_list_of_authors(dbm, project):
                     JOIN person pers ON p.id = pers.projectId
 
                     # filter for current release range and artifact
-                    WHERE p.name = %s
+                    WHERE p.name = '%s'
 
                     ORDER BY name ASC
 
                     # LIMIT 10
-               """,
+               """ %
                project
                )
 
@@ -86,16 +86,16 @@ def __select_artifacts_per_author(dbm, project, tagging, revision, entitytype="F
                     JOIN person pers ON c.author = pers.id
 
                     # filter for current release range and artifact
-                    WHERE p.name = %s
-                    AND p.analysisMethod = %s
-                    AND l2.tag = %s
-                    AND cd.entityType = %s
+                    WHERE p.name = '%s'
+                    AND p.analysisMethod = '%s'
+                    AND l2.tag = '%s'
+                    AND cd.entityType = '%s'
 
                     GROUP BY name, artifact ASC
                     ORDER BY id, artifact ASC
 
                     # LIMIT 10
-                """,
+                """ %
                (project, tagging, revision, entitytype)
                )
 
@@ -173,7 +173,7 @@ def run_extraction(systems, artifact2tagging, codeface_conf, project_conf, resdi
                 start_rev = revs[i]
                 end_rev = revs[i + 1]
 
-                print (project, tagging, kind, start_rev, end_rev)
+                # print (project, tagging, kind, start_rev, end_rev)
 
                 # results directory for current revision
                 range_resdir = pathjoin(project_resdir, "{0}-{1}".format(start_rev, end_rev))
@@ -190,7 +190,7 @@ if __name__ == '__main__':
     # CONSTANTS
     ##
 
-    __systems = ["busybox", "linux", "openssl", "sqlite", "tcl"]
+    __systems = ["busybox", "openssl"]  # , "linux", "sqlite", "tcl"
     #  FIXME run all analyses again. completely.
 
     __artifact2tagging = {
@@ -203,11 +203,13 @@ if __name__ == '__main__':
     # CONSTRUCT PATHS
     ##
 
-    __cf_vm = "/local/hunsen/codeface"
+    # __cf_vm = "/local/hunsen/codeface"
+    __cf_vm = "/home/codeface"
+
     __cf_dir = pathjoin(__cf_vm, "codeface-repo")
 
     __resdir = pathjoin(__cf_vm, "results")
-    __codeface_conf = pathjoin(__cf_dir, "codeface-test-a2a.conf")
+    __codeface_conf = pathjoin(__cf_dir, "codeface.conf")
     __project_conf = pathjoin(__cf_dir, "conf/spl/{}_{}.conf")
 
     run_extraction(__systems, __artifact2tagging, __codeface_conf, __project_conf, __resdir)
