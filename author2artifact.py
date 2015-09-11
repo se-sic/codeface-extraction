@@ -149,11 +149,11 @@ def run_extraction(systems, artifact2tagging, codeface_conf, project_conf, resdi
     :param resdir: the Codeface results dir, where output files are written
     """
 
-    # for all projects
-    for current_system in systems:
+    # for all kinds of artifacts
+    for kind, (artifact, tagging) in artifact2tagging.iteritems():
 
-        # for all kinds of artifacts
-        for kind, (artifact, tagging) in artifact2tagging.iteritems():
+        # for all projects
+        for current_system in systems:
 
             log.info("%s: Extracting '%s' from '%s' analysis" % (current_system, artifact, tagging))
 
