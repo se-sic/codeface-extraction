@@ -3,15 +3,17 @@
 This file is able to extract developer--artifact relations from the Codeface database.
 """
 
-from logging import getLogger
+import logging
 
-log = getLogger(__name__)
 from os.path import join as pathjoin, exists as pathexists
 from os import makedirs
 
 from codeface.dbmanager import DBManager
 from codeface.configuration import Configuration
 
+logging.basicConfig()
+log = logging.getLogger(__name__)
+log.setLevel("INFO")
 
 # FIXME add feature expression to Codeface database!
 
@@ -152,6 +154,8 @@ def run_extraction(systems, artifact2tagging, codeface_conf, project_conf, resdi
 
         # for all kinds of artifacts
         for kind, (artifact, tagging) in artifact2tagging.iteritems():
+
+            log.info("%s: Extracting '%s' from '%s' analysis" % (current_system, artifact, tagging))
 
             # load configuration and initialize database manager
             conf = Configuration.load(codeface_conf, project_conf.format(current_system, tagging))
