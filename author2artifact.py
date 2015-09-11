@@ -199,7 +199,8 @@ if __name__ == '__main__':
 
     __artifact2tagging = {
         'author2feature': ("Feature", 'feature'),
-        'author2function': ("Function", 'proximity')  # ,
+        'author2function': ("Function", 'proximity'),
+        'author2featureexpression': ('FeatureExpression', 'feature')
         # 'author2file':  ("file", "proximity")  # FIXME implement author2file (needs new SELECT)
     }
 
