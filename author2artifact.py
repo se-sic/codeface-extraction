@@ -15,8 +15,6 @@ logging.basicConfig()
 log = logging.getLogger(__name__)
 log.setLevel("INFO")
 
-# FIXME add feature expression to Codeface database!
-
 
 def __select_list_of_authors(dbm, project):
     dbm.doExec("""
@@ -108,7 +106,7 @@ def __select_artifacts_per_author(dbm, project, tagging, revision, entitytype="F
 def get_artifacts_per_author(dbm, project, tagging, kind, end_rev, artifact, range_resdir):
     """
     Selects the list of artifacts per developer for the given project, tagging, and release range, using the
-    database-manager parameter.The kind of artifact is defined by the kind parameter. Afterwards, the pairs
+    database-manager parameter. The kind of artifact is defined by the kind parameter. Afterwards, the pairs
     (author_name, artifact_name) are written to the file '[kind].list' in range_resdir.
 
     :param dbm: the database manager to use
@@ -128,6 +126,79 @@ def get_artifacts_per_author(dbm, project, tagging, kind, end_rev, artifact, ran
 
     # write lines to file for current kind of artifact (e.g., authors2feature, authors2function)
     outfile = pathjoin(range_resdir, kind + ".list")
+    f = open(outfile, 'w')
+    f.writelines(lines)
+    f.close()
+
+
+def __select_artifacts_per_commit(dbm, project, tagging, revision, entitytype="FEATURE"):
+    dbm.doExec("""
+                    SELECT c.id, cd.entityId AS artifact
+
+                    FROM project p
+
+                    # get release range for projects
+                    JOIN release_range r
+                    ON p.id = r.projectId
+
+                    # start of range
+                    JOIN release_timeline l1
+                    ON r.releaseStartId = l1.id
+                    # end of range
+                    JOIN release_timeline l2
+                    ON r.releaseEndId = l2.id
+
+                    # add commits for the ranges
+                    JOIN commit c
+                    on r.id = c.releaseRangeId
+
+                    # add meta-data for commits
+                    JOIN commit_dependency cd
+                    ON c.id = cd.commitId
+
+                    # add authors/developers/persons
+                    JOIN person pers
+                    ON c.author = pers.id
+
+                    # filter for current release range and artifact
+                    WHERE p.name = '%s'
+                    AND p.analysisMethod = '%s'
+                    AND l2.tag = '%s'
+                    AND cd.entityType = '%s'
+
+                    ORDER BY c.id, cd.entityId
+
+                    # LIMIT 10
+                """ %
+               (project, tagging, revision, entitytype)
+               )
+
+    authors_to_artifacts = dbm.doFetchAll()
+    return authors_to_artifacts
+
+
+def get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir):
+    """
+    Selects the list of touched artifacts per commit for the given project, tagging, and release range, using the
+    database-manager parameter. The kind of artifact is defined by the kind parameter. Afterwards, the sets are written
+     to the file 'cochanged-artifacts.list' in range_resdir.
+
+    :param dbm: the database manager to use
+    :param project: the project name to search
+    :param tagging: the tagging analysis for the current project
+    :param end_rev: the release tag defining the end of a release range
+    :param artifact: the kind of artifact to search for
+    :param range_resdir: the desired release range of the project
+    """
+
+    # get list of changed artifacts per author
+    commit2artifact = __select_artifacts_per_commit(dbm, project, tagging, end_rev, artifact)
+
+    # convert c2a to tuples (commit, artifact)
+    lines = ["{}; {}\n".format(commit_id, art) for commit_id, art in commit2artifact]
+
+    # write lines to file for current kind of artifact
+    outfile = pathjoin(range_resdir, "commit2" + artifact.lower() + ".list")
     f = open(outfile, 'w')
     f.writelines(lines)
     f.close()
@@ -166,12 +237,6 @@ def run_extraction(systems, artifact2tagging, codeface_conf, project_conf, resdi
             revs = conf["revisions"]
             project_resdir = pathjoin(resdir, current_system, tagging)
 
-            # FIXME check if project exists in database, continue otherwise
-            # if dbm.cur.rowcount == 0:
-            #     # Project is not contained in the database
-            #     raise Exception("Project {}/{} does not exist in database!".
-            #                     format(project, tagging))
-
             # for all revisions of this project
             for i in range(len(revs) - 1):
                 start_rev = revs[i]
@@ -185,8 +250,10 @@ def run_extraction(systems, artifact2tagging, codeface_conf, project_conf, resdi
                     makedirs(range_resdir)
 
                 get_artifacts_per_author(dbm, project, tagging, kind, end_rev, artifact, range_resdir)
-
                 get_list_of_authors(dbm, project, range_resdir)
+
+                # further extractions
+                get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir)
 
 
 if __name__ == '__main__':
@@ -197,6 +264,7 @@ if __name__ == '__main__':
     __systems = ["busybox", "openssl"]  # , "linux", "sqlite", "tcl"
     #  FIXME run all analyses again. completely.
 
+    # kind: (artifact, tagging)
     __artifact2tagging = {
         'author2feature': ("Feature", 'feature'),
         'author2function': ("Function", 'proximity'),
