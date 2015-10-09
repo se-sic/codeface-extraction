@@ -261,7 +261,7 @@ if __name__ == '__main__':
     # CONSTANTS
     ##
 
-    __systems = ["busybox", "openssl"]  # , "linux", "sqlite", "tcl"
+    __systems = ["sqlite", "tcl", "linux"]  # , "linux"  # completed:  ["sqlite", "busybox", "openssl"]
     #  FIXME run all analyses again. completely.
 
     # kind: (artifact, tagging)
