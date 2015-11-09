@@ -1,8 +1,9 @@
 SET @proj = 'busybox';
-SET @tagging = 'feature';
-SET @rev = '1_22_0';
+SET @tagging = 'proximity';
+SET @rev = '1_17_0';
 
-SELECT p.name, c.releaseRangeId, c.clusterMethod, l2.tag, p1.name as author1, p2.name as author2, SUM(el.weight) as weight
+SELECT el.fromId, el.toId, SUM(el.weight) as weight
+#SELECT p.name, c.releaseRangeId, c.clusterMethod, l2.tag, el.fromId, p1.name as author1, el.toId, p2.name as author2, SUM(el.weight) as weight
 
 FROM project p
 
@@ -17,16 +18,16 @@ ON r.releaseStartId = l1.id
 JOIN release_timeline l2
 ON r.releaseEndId = l2.id
 
-# add clusters
+# add cluster analysis
 JOIN cluster c
 ON r.id = c.releaseRangeId
-
+# and corresponding edgelist
 JOIN edgelist el
 ON el.clusterId = c.id
 
+# add authors/developers/persons
 JOIN person p1
 ON el.fromId = p1.id
-
 JOIN person p2
 ON el.toId = p2.id
 
@@ -36,7 +37,7 @@ AND p.analysisMethod = @tagging
 AND l2.tag = @rev
 AND c.clusterMethod = "email"
 
-GROUP BY author1, author2
-ORDER BY author1 ASC, author2 ASC
+GROUP BY p1.id, p2.id
+ORDER BY p1.id ASC, p2.id ASC
 
-;
+# LIMIT 10
