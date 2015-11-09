@@ -23,12 +23,13 @@ def __select_list_of_authors(dbm, project):
                     FROM project p
 
                     # add authors/developers/persons
-                    JOIN person pers ON p.id = pers.projectId
+                    JOIN person pers
+                    ON p.id = pers.projectId
 
                     # filter for current release range and artifact
                     WHERE p.name = '%s'
 
-                    ORDER BY name ASC
+                    ORDER BY pers.id ASC
 
                     # LIMIT 10
                """ %
@@ -180,7 +181,7 @@ def __select_artifacts_per_commit(dbm, project, tagging, revision, entitytype="F
 def get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir):
     """
     Selects the list of touched artifacts per commit for the given project, tagging, and release range, using the
-    database-manager parameter. The kind of artifact is defined by the kind parameter. Afterwards, the sets are written
+    database-manager parameter. Afterwards, the sets are written
      to the file 'cochanged-artifacts.list' in range_resdir.
 
     :param dbm: the database manager to use
@@ -199,6 +200,80 @@ def get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resd
 
     # write lines to file for current kind of artifact
     outfile = pathjoin(range_resdir, "commit2" + artifact.lower() + ".list")
+    f = open(outfile, 'w')
+    f.writelines(lines)
+    f.close()
+
+
+def __select_mailing_authors(dbm, project, tagging, revision):
+    dbm.doExec("""
+                    SELECT el.fromId, el.toId, SUM(el.weight) as weight
+
+                    FROM project p
+
+                    # get release range for projects
+                    JOIN release_range r
+                    ON p.id = r.projectId
+
+                    # start of range
+                    JOIN release_timeline l1
+                    ON r.releaseStartId = l1.id
+                    # end of range
+                    JOIN release_timeline l2
+                    ON r.releaseEndId = l2.id
+
+                    # add cluster analysis
+                    JOIN cluster c
+                    ON r.id = c.releaseRangeId
+                    # and corresponding edgelist
+                    JOIN edgelist el
+                    ON el.clusterId = c.id
+
+                    # add authors/developers/persons
+                    JOIN person p1
+                    ON el.fromId = p1.id
+                    JOIN person p2
+                    ON el.toId = p2.id
+
+                    # filter for current release range and artifact
+                    WHERE p.name = '%s'
+                    AND p.analysisMethod = '%s'
+                    AND l2.tag = '%s'
+                    AND c.clusterMethod = "email"
+
+                    GROUP BY p1.id, p2.id
+                    ORDER BY p1.id ASC, p2.id ASC
+
+                    # LIMIT 10
+                """ %
+               (project, tagging, revision)
+               )
+
+    authors_to_artifacts = dbm.doFetchAll()
+    return authors_to_artifacts
+
+
+def get_mailing_authors(dbm, project, tagging, end_rev, range_resdir):
+    """
+    Selects the list of author pairs that exchange e-mails for the given project, tagging, and release range, using the
+    database-manager parameter. Afterwards, the sets are written to the file 'authors_emailing.list' in range_resdir.
+
+    :param dbm: the database manager to use
+    :param project: the project name to search
+    :param tagging: the tagging analysis for the current project
+    :param end_rev: the release tag defining the end of a release range
+    :param range_resdir: the desired release range of the project
+    """
+
+    # get list of changed artifacts per author
+    author2author = __select_mailing_authors(dbm, project, tagging, end_rev)
+
+    # convert a2a to edgelist
+    lines = ["{}; {}; {}\n".format(author_from, author_to, weight) for author_from, author_to, weight in author2author]
+
+    # write lines to file for current kind of artifact
+    #fixme use a separate mail folder?!
+    outfile = pathjoin(range_resdir, "authors.network.mailinglist.list")
     f = open(outfile, 'w')
     f.writelines(lines)
     f.close()
@@ -249,11 +324,17 @@ def run_extraction(systems, artifact2tagging, codeface_conf, project_conf, resdi
                 if not pathexists(range_resdir):
                     makedirs(range_resdir)
 
-                get_artifacts_per_author(dbm, project, tagging, kind, end_rev, artifact, range_resdir)
+                # get_artifacts_per_author(dbm, project, tagging, kind, end_rev, artifact, range_resdir)
                 get_list_of_authors(dbm, project, range_resdir)
 
                 # further extractions
-                get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir)
+                # get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir)
+
+                # extract mailing-list analysis (associated with proximity projects!)
+                if tagging == 'proximity':
+                    log.info("%s: Extracting mailing network from '%s_%s' for version '%s'" % (
+                        current_system, current_system, tagging, end_rev))
+                    get_mailing_authors(dbm, project, tagging, end_rev, range_resdir)
 
 
 if __name__ == '__main__':
@@ -261,7 +342,7 @@ if __name__ == '__main__':
     # CONSTANTS
     ##
 
-    __systems = ["sqlite", "tcl", "linux"]  # , "linux"  # completed:  ["sqlite", "busybox", "openssl"]
+    __systems = ["busybox"]  # ["sqlite", "sqlite", "tcl", "linux", "openssl"]
     #  FIXME run all analyses again. completely.
 
     # kind: (artifact, tagging)
