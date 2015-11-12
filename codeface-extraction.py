@@ -4,12 +4,12 @@ This file is able to extract developer--artifact relations from the Codeface dat
 """
 
 import logging
-
-from os.path import join as pathjoin, exists as pathexists
+from os.path import join as pathjoin, exists as pathexists, abspath
 from os import makedirs
-
+import argparse
+import sys
 from codeface.dbmanager import DBManager
-from codeface.configuration import Configuration
+from codeface.configuration import Configuration, ConfigurationError
 
 logging.basicConfig()
 log = logging.getLogger(__name__)
@@ -272,7 +272,7 @@ def get_mailing_authors(dbm, project, tagging, end_rev, range_resdir):
     lines = ["{}; {}; {}\n".format(author_from, author_to, weight) for author_from, author_to, weight in author2author]
 
     # write lines to file for current kind of artifact
-    #fixme use a separate mail folder?!
+    # fixme use a separate mail folder?!
     outfile = pathjoin(range_resdir, "authors.network.mailinglist.list")
     f = open(outfile, 'w')
     f.writelines(lines)
@@ -283,87 +283,98 @@ def get_mailing_authors(dbm, project, tagging, end_rev, range_resdir):
 # RUN FOR ALL PROJECTS
 ##
 
-def run_extraction(systems, artifact2tagging, codeface_conf, project_conf, resdir):
+def run_extraction(conf, artifact2extraction, resdir):
     """
     Runs the extraction process for the list of given parameters.
 
-    :param systems: the list of software systems analyzed by Codeface, e.g., 'busybox'
-    :param artifact2tagging: a dict mapping extraction-process names to the kind of artifact to extract;
-           e.g., 'author2feature':'FEATURE'
-    :param codeface_conf: the Codeface configuration to load
-    :param project_conf: the project configuration to load (for release ranges)
+    :param conf: the Codeface configuration object
+    :param artifact2extraction: a list of pairs (kind of artifact to extract, extraction-process name);
+           e.g., [('Feature', 'author2feature')]
     :param resdir: the Codeface results dir, where output files are written
     """
 
-    # for all kinds of artifacts
-    for kind, (artifact, tagging) in artifact2tagging.iteritems():
+    log.info("%s: Extracting data" % conf["project"])
 
-        # for all projects
-        for current_system in systems:
+    # initialize database manager with given configuration
+    dbm = DBManager(conf)
 
-            log.info("%s: Extracting '%s' from '%s' analysis" % (current_system, artifact, tagging))
+    # get setting for current combination
+    project = conf["project"]
+    project_resdir = conf["repo"]
+    revs = conf["revisions"]
+    tagging = conf["tagging"]
+    project_resdir = pathjoin(resdir, project_resdir, tagging)
 
-            # load configuration and initialize database manager
-            conf = Configuration.load(codeface_conf, project_conf.format(current_system, tagging))
-            dbm = DBManager(conf)
+    # for all revisions of this project
+    for i in range(len(revs) - 1):
+        start_rev = revs[i]
+        end_rev = revs[i + 1]
 
-            # get setting for current combination
-            project = conf["project"]
-            revs = conf["revisions"]
-            project_resdir = pathjoin(resdir, current_system, tagging)
+        # print (project, tagging, kind, start_rev, end_rev)
 
-            # for all revisions of this project
-            for i in range(len(revs) - 1):
-                start_rev = revs[i]
-                end_rev = revs[i + 1]
+        # results directory for current revision
+        range_resdir = pathjoin(project_resdir, "{0}-{1}".format(start_rev, end_rev))
+        if not pathexists(range_resdir):
+            makedirs(range_resdir)
 
-                # print (project, tagging, kind, start_rev, end_rev)
+        # get the list of authors in this project
+        get_list_of_authors(dbm, project, range_resdir)
 
-                # results directory for current revision
-                range_resdir = pathjoin(project_resdir, "{0}-{1}".format(start_rev, end_rev))
-                if not pathexists(range_resdir):
-                    makedirs(range_resdir)
+        # extract the author--artifact list for all kinds
+        for (artifact, extraction) in artifact2extraction:
+            log.info("%s: Extracting data: %s" % (conf["project"], extraction))
+            get_artifacts_per_author(dbm, project, tagging, extraction, end_rev, artifact, range_resdir)
 
-                # get_artifacts_per_author(dbm, project, tagging, kind, end_rev, artifact, range_resdir)
-                get_list_of_authors(dbm, project, range_resdir)
+        # get co-changed artifacts (= artifacts per commit)
+        get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir)
 
-                # further extractions
-                # get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir)
+        # extract mailing-list analysis (associated with proximity projects!)
+        if tagging == 'proximity':
+            log.info("%s: Extracting mailing network for version '%s'" % (conf["project"], end_rev))
+            get_mailing_authors(dbm, project, tagging, end_rev, range_resdir)
 
-                # extract mailing-list analysis (associated with proximity projects!)
-                if tagging == 'proximity':
-                    log.info("%s: Extracting mailing network from '%s_%s' for version '%s'" % (
-                        current_system, current_system, tagging, end_rev))
-                    get_mailing_authors(dbm, project, tagging, end_rev, range_resdir)
+
+def get_parser():
+    """
+    Construct parser for the extraction process.
+
+    :return: the constructed parser
+    """
+    run_parser = argparse.ArgumentParser(prog='codeface', description='Codeface extraction')
+    run_parser.add_argument('-c', '--config', help="Codeface configuration file",
+                            default='codeface.conf')
+    run_parser.add_argument('-p', '--project', help="Project configuration file",
+                            required=True)
+    run_parser.add_argument('resdir',
+                            help="Directory to store analysis results in")
+
+    return run_parser
 
 
 if __name__ == '__main__':
-    ##
-    # CONSTANTS
-    ##
+    # get Codeface parser
+    parser = get_parser()
+    args = parser.parse_args(sys.argv[1:])  # Note: The first argument of argv is the name of the command
 
-    __systems = ["busybox"]  # ["sqlite", "sqlite", "tcl", "linux", "openssl"]
-    #  FIXME run all analyses again. completely.
+    # process arguments
+    # - First make all the args absolute
+    __resdir = abspath(args.resdir)
+    __codeface_conf, __project_conf = map(abspath, (args.config, args.project))
 
-    # kind: (artifact, tagging)
+    __conf = Configuration.load(__codeface_conf, __project_conf)
+    # project_analyse(resdir, gitdir, codeface_conf, project_conf,
+    #                args.no_report, args.loglevel, logfile, args.recreate,
+    #                args.profile_r, args.jobs, args.tagging, args.reuse_db)
+
     __artifact2tagging = {
-        'author2feature': ("Feature", 'feature'),
-        'author2function': ("Function", 'proximity'),
-        'author2featureexpression': ('FeatureExpression', 'feature')
-        # 'author2file':  ("file", "proximity")  # FIXME implement author2file (needs new SELECT)
+        'feature': [
+            ('Feature', 'author2feature'),
+            ('FeatureExpression', 'author2featureexpression')
+        ],
+        'proximity': [
+            ('Function', 'author2function')
+        ]
+        # ('Function', 'author2file')  # FIXME implement author2file (needs new SELECT)
     }
 
-    ##
-    # CONSTRUCT PATHS
-    ##
-
-    # __cf_vm = "/local/hunsen/codeface"
-    __cf_vm = "/home/codeface"
-
-    __cf_dir = pathjoin(__cf_vm, "codeface-repo")
-
-    __resdir = pathjoin(__cf_vm, "results")
-    __codeface_conf = pathjoin(__cf_dir, "codeface.conf")
-    __project_conf = pathjoin(__cf_dir, "conf/spl/{}_{}.conf")
-
-    run_extraction(__systems, __artifact2tagging, __codeface_conf, __project_conf, __resdir)
+    run_extraction(__conf, __artifact2tagging[__conf["tagging"]], __resdir)

@@ -10,5 +10,5 @@ SCRIPT="extraction/codeface-extraction.py" # the Python script to run: the extra
 export PYTHONPATH=:${CFDIR}:${PYTHONPATH}
 
 # run the extraction process
-python -B ${SCRIPT}
+python -B ${SCRIPT} "$@"
 
