@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ) # script dir
-SCRIPT="extraction/codeface-extraction.py" # the Python script to run: the extraction process
+SCRIPT="codeface-extraction/codeface-extraction.py" # the Python script to run: the extraction process
 
 #CFDIR="/home/hunsen/codeface/codeface-repo" # root of Codeface repository
 
