@@ -12,7 +12,7 @@ from codeface.dbmanager import DBManager
 from codeface.configuration import Configuration, ConfigurationError
 
 logging.basicConfig()
-log = logging.getLogger(__name__)
+log = logging.getLogger("codeface-extraction")
 log.setLevel("INFO")
 
 
@@ -320,13 +320,15 @@ def run_extraction(conf, artifact2extraction, resdir):
         # get the list of authors in this project
         get_list_of_authors(dbm, project, range_resdir)
 
-        # extract the author--artifact list for all kinds
+        # for all kinds of artifacts that have been analyzed for the current tagging
         for (artifact, extraction) in artifact2extraction:
             log.info("%s: Extracting data: %s" % (conf["project"], extraction))
+
+            # extract the author--artifact list
             get_artifacts_per_author(dbm, project, tagging, extraction, end_rev, artifact, range_resdir)
 
-        # get co-changed artifacts (= artifacts per commit)
-        get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir)
+            # get co-changed artifacts (= artifacts per commit)
+            get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir)
 
         # extract mailing-list analysis (associated with proximity projects!)
         if tagging == 'proximity':
@@ -351,7 +353,7 @@ def get_parser():
     return run_parser
 
 
-if __name__ == '__main__':
+def run():
     # get Codeface parser
     parser = get_parser()
     args = parser.parse_args(sys.argv[1:])  # Note: The first argument of argv is the name of the command
@@ -378,3 +380,7 @@ if __name__ == '__main__':
     }
 
     run_extraction(__conf, __artifact2tagging[__conf["tagging"]], __resdir)
+
+
+if __name__ == '__main__':
+    run()
