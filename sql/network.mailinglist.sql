@@ -1,5 +1,5 @@
 SET @proj = 'busybox';
-SET @tagging = 'proximity';
+SET @tagging = 'feature';
 SET @rev = '1_17_0';
 
 SELECT el.fromId, el.toId, SUM(el.weight) as weight
