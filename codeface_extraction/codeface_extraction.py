@@ -330,8 +330,8 @@ def run_extraction(conf, artifact2extraction, resdir):
             # get co-changed artifacts (= artifacts per commit)
             get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir)
 
-        # extract mailing-list analysis (associated with proximity projects!)
-        if tagging == 'proximity':
+        # extract mailing-list analysis (associated with proximity/feature projects!)
+        if tagging == 'proximity' or tagging == 'feature':
             log.info("%s: Extracting mailing network for version '%s'" % (conf["project"], end_rev))
             get_mailing_authors(dbm, project, tagging, end_rev, range_resdir)
 
