@@ -3,17 +3,15 @@
 This file is able to extract developer--artifact relations from the Codeface database.
 """
 
-import logging
+
 from os.path import join as pathjoin, exists as pathexists, abspath
 from os import makedirs
 import argparse
 import sys
+
+from codeface.cli import log
 from codeface.dbmanager import DBManager
 from codeface.configuration import Configuration, ConfigurationError
-
-logging.basicConfig()
-log = logging.getLogger("codeface-extraction")
-log.setLevel("INFO")
 
 
 def __select_list_of_authors(dbm, project):
