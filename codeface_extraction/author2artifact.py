@@ -47,7 +47,7 @@ def __select_artifacts_per_author(dbm, project, tagging, revision, entitytype="F
     return authors_to_artifacts
 
 
-def get_artifacts_per_author(dbm, project, tagging, kind, end_rev, artifact, range_resdir):
+def get_artifacts_per_author(dbm, project, tagging, end_rev, artifact, range_resdir):
     """
     Selects the list of artifacts per developer for the given project, tagging, and release range, using the
     database-manager parameter. The kind of artifact is defined by the kind parameter. Afterwards, the pairs
@@ -56,7 +56,6 @@ def get_artifacts_per_author(dbm, project, tagging, kind, end_rev, artifact, ran
     :param dbm: the database manager to use
     :param project: the project name to search
     :param tagging: the tagging analysis for the current project
-    :param kind: the current extraction to run, also name of output file
     :param end_rev: the release tag defining the end of a release range
     :param artifact: the kind of artifact to search for
     :param range_resdir: the desired release range of the project
@@ -69,7 +68,7 @@ def get_artifacts_per_author(dbm, project, tagging, kind, end_rev, artifact, ran
     lines = ["{}; {}\n".format(dev_name, art) for dev_id, dev_name, art in authors_to_artifacts]
 
     # write lines to file for current kind of artifact (e.g., authors2feature, authors2function)
-    outfile = pathjoin(range_resdir, kind + ".list")
+    outfile = pathjoin(range_resdir, "author2" + artifact.lower() + ".list")
     f = open(outfile, 'w')
     f.writelines(lines)
     f.close()

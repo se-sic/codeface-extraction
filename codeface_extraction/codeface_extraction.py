@@ -21,13 +21,12 @@ from commit2artifact import *
 # RUN FOR ALL PROJECTS
 ##
 
-def run_extraction(conf, artifact2extraction, resdir):
+def run_extraction(conf, artifacts, resdir):
     """
     Runs the extraction process for the list of given parameters.
 
     :param conf: the Codeface configuration object
-    :param artifact2extraction: a list of pairs (kind of artifact to extract, extraction-process name);
-           e.g., [('Feature', 'author2feature')]
+    :param artifacts: a list of artifacts to extract, e.g., ['Feature', 'FeatureExpression']
     :param resdir: the Codeface results dir, where output files are written
     """
 
@@ -59,11 +58,11 @@ def run_extraction(conf, artifact2extraction, resdir):
         get_list_of_authors(dbm, project, range_resdir)
 
         # for all kinds of artifacts that have been analyzed for the current tagging
-        for (artifact, extraction) in artifact2extraction:
-            log.info("%s: Extracting data: %s" % (conf["project"], extraction))
+        for artifact in artifacts:
+            log.info("%s: Extracting data: %s" % (conf["project"], artifact))
 
             # extract the author--artifact list
-            get_artifacts_per_author(dbm, project, tagging, extraction, end_rev, artifact, range_resdir)
+            get_artifacts_per_author(dbm, project, tagging, end_rev, artifact, range_resdir)
 
             # get co-changed artifacts (= artifacts per commit)
             get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir)
@@ -104,18 +103,13 @@ def run():
     # load configuration
     __conf = Configuration.load(__codeface_conf, __project_conf)
 
-    __artifact2tagging = {
-        'feature': [
-            ('Feature', 'author2feature'),
-            ('FeatureExpression', 'author2featureexpression')
-        ],
-        'proximity': [
-            ('Function', 'author2function')
-        ]
-        # ('Function', 'author2file')  # FIXME implement author2file (needs new SELECT)
+    __tagging2artifacts = {
+        'feature': ['Feature', 'FeatureExpression'],
+        'proximity': ['Function']
+        # 'file': ['File']  # FIXME implement author2file (needs new SELECT)
     }
 
-    run_extraction(__conf, __artifact2tagging[__conf["tagging"]], __resdir)
+    run_extraction(__conf, __tagging2artifacts[__conf["tagging"]], __resdir)
 
 
 if __name__ == '__main__':
