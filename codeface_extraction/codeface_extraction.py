@@ -12,6 +12,7 @@ from codeface.cli import log
 from codeface.dbmanager import DBManager
 from codeface.configuration import Configuration
 from authors import *
+from revisions import *
 from author2artifact import *
 from thread2authors import *
 from commit2artifact import *
@@ -41,6 +42,21 @@ def run_extraction(conf, artifacts, resdir):
     revs = conf["revisions"]
     tagging = conf["tagging"]
     project_resdir = pathjoin(resdir, project_resdir, tagging)
+
+    # create results directory
+    if not pathexists(project_resdir):
+        makedirs(project_resdir)
+
+    # extract list of revisions as stored in the database
+    list_of_revisions = get_list_of_revisions(dbm, project, project_resdir)
+
+    # check if list of revisions in database is the same as in the config file
+    if revs and set(revs) is not set(list_of_revisions):
+        log.error("List of revisions in configuration file do not match the list stored in the DB! Stopping now.")
+        sys.exit(1)
+    else:
+        log.info("No list of revisions found in configuration file, using the list from the DB instead!")
+        revs = list_of_revisions  # set list of revisions as stored in the database
 
     # for all revisions of this project
     for i in range(len(revs) - 1):
