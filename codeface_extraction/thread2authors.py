@@ -51,7 +51,7 @@ def __select_mailing_authors(dbm, project, tagging, revision):
 def get_mailing_authors(dbm, project, tagging, end_rev, range_resdir):
     """
     Selects the list of author pairs that exchange e-mails for the given project, tagging, and release range, using the
-    database-manager parameter. Afterwards, the sets are written to the file 'authors_emailing.list' in range_resdir.
+    database-manager parameter. Afterwards, the sets are written to the file 'thread2authors.list' in range_resdir.
 
     :param dbm: the database manager to use
     :param project: the project name to search
