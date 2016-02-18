@@ -30,14 +30,14 @@ def __select_list_of_authors(dbm, project):
     return list_of_authors
 
 
-def get_list_of_authors(dbm, project, range_resdir):
+def get_list_of_authors(dbm, project, project_resdir):
     """
     Selects the list of authors for the given project, using the database-manager parameter.
-    Afterwards, the pairs (author_id, author_name) are written to the file 'authors.list' in range_resdir.
+    Afterwards, the pairs (author_id, author_name) are written to the file 'authors.list' in project_resdir.
 
     :param dbm: the database manager to use
     :param project: the project name to search
-    :param range_resdir: the desired release range of the project
+    :param project_resdir: the results directory of the current project
     """
 
     # get authors for given project
@@ -47,7 +47,7 @@ def get_list_of_authors(dbm, project, range_resdir):
     lines = ["{}; {}\n".format(dev_id, dev_name) for dev_id, dev_name in list_of_authors]
 
     # write lines to file
-    outfile = pathjoin(range_resdir, "authors.list")
+    outfile = pathjoin(project_resdir, "authors.list")
     f = open(outfile, 'w')
     f.writelines(lines)
     f.close()

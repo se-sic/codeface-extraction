@@ -49,6 +49,8 @@ def run_extraction(conf, artifacts, resdir):
 
     # extract list of revisions as stored in the database
     list_of_revisions = get_list_of_revisions(dbm, project, project_resdir)
+    # get the list of authors in this project
+    get_list_of_authors(dbm, project, project_resdir)
 
     # check if list of revisions in database is the same as in the config file
     if revs and set(revs) is not set(list_of_revisions):
@@ -69,9 +71,6 @@ def run_extraction(conf, artifacts, resdir):
         range_resdir = pathjoin(project_resdir, "{0}-{1}".format(start_rev, end_rev))
         if not pathexists(range_resdir):
             makedirs(range_resdir)
-
-        # get the list of authors in this project
-        get_list_of_authors(dbm, project, range_resdir)
 
         # for all kinds of artifacts that have been analyzed for the current tagging
         for artifact in artifacts:
