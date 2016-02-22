@@ -4,8 +4,6 @@ This file provides the needed functions for the authors extraction.
 """
 
 from os.path import join as pathjoin
-import sys
-from codeface.cli import log
 
 
 def __select_list_of_revisions(dbm, project):
@@ -47,7 +45,7 @@ def get_list_of_revisions(dbm, project, project_resdir):
 
     # get revisions for given project
     list_of_revisions = __select_list_of_revisions(dbm, project)
-    list_of_revisions = [rev for (rev, ) in list_of_revisions]
+    list_of_revisions = [rev for (rev,) in list_of_revisions]
 
     # convert to a proper list for file writing
     lines = ["{}\n".format(rev) for rev in list_of_revisions]

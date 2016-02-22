@@ -3,19 +3,20 @@
 This file is able to extract developer--artifact relations from the Codeface database.
 """
 
-from os.path import exists as pathexists, abspath
-from os import makedirs
 import argparse
 import sys
+from os import makedirs
+from os.path import exists as pathexists, abspath
 
 from codeface.cli import log
-from codeface.dbmanager import DBManager
 from codeface.configuration import Configuration
-from authors import *
-from revisions import *
+from codeface.dbmanager import DBManager
+
 from author2artifact import *
-from thread2authors import *
+from authors import *
 from commit2artifact import *
+from revisions import *
+from thread2authors import *
 
 
 ##
