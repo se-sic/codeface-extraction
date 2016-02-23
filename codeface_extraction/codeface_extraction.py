@@ -54,7 +54,7 @@ def run_extraction(conf, artifacts, resdir):
     get_list_of_authors(dbm, project, project_resdir)
 
     # check if list of revisions in database is the same as in the config file
-    if revs and set(revs) is not set(list_of_revisions):
+    if revs and set(revs) != set(list_of_revisions):
         log.error("List of revisions in configuration file do not match the list stored in the DB! Stopping now.")
         sys.exit(1)
     else:
