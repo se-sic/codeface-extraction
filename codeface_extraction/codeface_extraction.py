@@ -13,6 +13,7 @@ from codeface.configuration import Configuration
 from codeface.dbmanager import DBManager
 
 from author2artifact import *
+from author2file import *
 from authors import *
 from commit2artifact import *
 from revisions import *
@@ -83,10 +84,14 @@ def run_extraction(conf, artifacts, resdir):
             # get co-changed artifacts (= artifacts per commit)
             get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resdir)
 
-        # extract mailing-list analysis (associated with proximity/feature projects!)
         if tagging == 'proximity' or tagging == 'feature':
+            # extract mailing-list analysis (associated with proximity/feature projects!)
             log.info("%s: Extracting mailing network for version '%s'" % (conf["project"], end_rev))
             get_mailing_authors(dbm, project, tagging, end_rev, range_resdir)
+
+            # extract author2file mapping (embedded into proximity/feature projects!)
+            log.info("%s: Extracting file network for version '%s'" % (conf["project"], end_rev))
+            get_files_per_author(dbm, project, tagging, end_rev, range_resdir)
 
 
 def get_parser():
@@ -122,7 +127,6 @@ def run():
     __tagging2artifacts = {
         'feature': ['Feature', 'FeatureExpression'],
         'proximity': ['Function']
-        # 'file': ['File']  # FIXME implement author2file (needs new SELECT)
     }
 
     run_extraction(__conf, __tagging2artifacts[__conf["tagging"]], __resdir)
