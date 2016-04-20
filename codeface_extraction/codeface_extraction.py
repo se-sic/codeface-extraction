@@ -16,6 +16,7 @@ from author2artifact import *
 from author2file import *
 from authors import *
 from commit2artifact import *
+from commit2file import *
 from revisions import *
 from thread2authors import *
 
@@ -95,6 +96,7 @@ def run_extraction(conf, artifacts, resdir):
             # extract author2file mapping (embedded into proximity/feature projects!)
             log.info("%s: Extracting file network for version '%s'" % (conf["project"], end_rev))
             get_files_per_author(dbm, project, tagging, end_rev, range_resdir)
+            get_cochanged_files(dbm, project, tagging, end_rev, range_resdir)
 
 
 def get_parser():
