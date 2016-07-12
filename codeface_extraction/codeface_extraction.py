@@ -19,6 +19,8 @@ from commit2artifact import *
 from commit2file import *
 from revisions import *
 from thread2authors import *
+from commits import *
+from emails import *
 
 
 ##
@@ -54,6 +56,10 @@ def run_extraction(conf, artifacts, resdir):
     list_of_revisions = get_list_of_revisions(dbm, project, project_resdir)
     # get the list of authors in this project
     get_list_of_authors(dbm, project, project_resdir)
+    # get the list of commits in this project
+    get_list_of_commits(dbm, project, tagging, project_resdir)
+    # get the list of emails in this project
+    get_list_of_emails(dbm, project, tagging, project_resdir)
 
     # check if list of revisions in database is the same as in the config file
     if revs:
