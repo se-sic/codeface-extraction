@@ -43,7 +43,7 @@ def run_extraction(conf, artifacts, resdir):
 
     # get setting for current combination
     project = conf["project"]
-    project_resdir = conf["repo"]
+    project_resdir = conf["project"]
     revs = conf["revisions"]
     tagging = conf["tagging"]
     project_resdir = pathjoin(resdir, project_resdir, tagging)
