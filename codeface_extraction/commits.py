@@ -30,7 +30,7 @@ def __select_commits(dbm, project, tagging):
 
                     AND p.analysisMethod = '%s'
 
-                    ORDER BY c.commitDate, a.name, cd.file, cd.entityId
+                    ORDER BY c.commitDate, a.name, c.id, cd.file, cd.entityId
 
                     # LIMIT 10
                 """ %
