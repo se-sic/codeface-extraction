@@ -8,7 +8,7 @@ from os.path import join as pathjoin
 
 def __select_commits(dbm, project, tagging):
     dbm.doExec("""
-		    SELECT c.id, c.commitDate, a.name, 
+		    SELECT c.id, c.authorDate, a.name, 
                            c.ChangedFiles, c.AddedLines, c.DeletedLines, c.DiffSize, 
                            cd.file, cd.entityId, cd.entityType, cd.size 
 
@@ -30,7 +30,7 @@ def __select_commits(dbm, project, tagging):
 
                     AND p.analysisMethod = '%s'
 
-                    ORDER BY c.commitDate, a.name, c.id, cd.file, cd.entityId
+                    ORDER BY c.authorDate, a.name, c.id, cd.file, cd.entityId
 
                     # LIMIT 10
                 """ %
@@ -56,9 +56,9 @@ def get_list_of_commits(dbm, project, tagging, project_resdir):
     commits = __select_commits(dbm, project, tagging)
 
     # convert commits to tuples
-    lines = ["{}; {}; {}; {}; {}; {}; {}; {}; {}; {}; {}\n".format(commitId, commitDate, name, 
+    lines = ["{}; {}; {}; {}; {}; {}; {}; {}; {}; {}; {}\n".format(commitId, authorDate, name, 
                            ChangedFiles, AddedLines, DeletedLines, DiffSize, 
-                           file, entityId, entityType, size ) for commitId, commitDate, name, 
+                           file, entityId, entityType, size ) for commitId, authorDate, name, 
                            ChangedFiles, AddedLines, DeletedLines, DiffSize, 
                            file, entityId, entityType, size in commits]
 
