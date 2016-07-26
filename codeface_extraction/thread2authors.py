@@ -37,7 +37,7 @@ def __select_mailing_authors(dbm, project, tagging, revision):
                     AND l2.tag = '%s'
                     AND m.creationDate BETWEEN l1.date AND l2.date
 
-                    ORDER BY m.threadId, pers.name ASC
+                    ORDER BY m.threadId, m.creationDate ASC
 
                     #LIMIT 10
                 """ %
