@@ -8,7 +8,7 @@ from os.path import join as pathjoin
 
 def __select_emails(dbm, project, tagging):
     dbm.doExec("""
-		    SELECT a.name AS authorName, m.creationDate, m.threadId 
+                    SELECT a.name AS authorName, a.email1, m.creationDate, m.subject, m.threadId
 
                     FROM project p
 

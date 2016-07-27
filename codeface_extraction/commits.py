@@ -8,9 +8,9 @@ from os.path import join as pathjoin
 
 def __select_commits(dbm, project, tagging):
     dbm.doExec("""
-		    SELECT c.id, c.authorDate, a.name, 
-                           c.ChangedFiles, c.AddedLines, c.DeletedLines, c.DiffSize, 
-                           cd.file, cd.entityId, cd.entityType, cd.size 
+                    SELECT c.id, c.authorDate, a.name,  a.email1, c.commitHash,
+                           c.ChangedFiles, c.AddedLines, c.DeletedLines, c.DiffSize,
+                           cd.file, cd.entityId, cd.entityType, cd.size
 
                     FROM project p
 
