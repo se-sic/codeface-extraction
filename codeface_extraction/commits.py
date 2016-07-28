@@ -14,20 +14,20 @@ def __select_commits(dbm, project, tagging):
 
                     FROM project p
 
+                    # get commits for project
                     JOIN commit c
-
                     ON p.id = c.projectId
 
+                    # get commit meta-data
                     JOIN commit_dependency cd
+                    ON c.id = cd.commitId
 
-                    ON c.id = cd.commitId 
-
+                    # add authors/developers/persons
                     JOIN person a
-
                     ON c.author = a.id
 
+                    # filter for current project
                     WHERE p.name = '%s'
-
                     AND p.analysisMethod = '%s'
 
                     ORDER BY c.authorDate, a.name, c.id, cd.file, cd.entityId

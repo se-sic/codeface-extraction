@@ -29,7 +29,7 @@ def __select_files_per_author(dbm, project, tagging, revision):
                     # add authors/developers/persons
                     JOIN person pers ON c.author = pers.id
 
-                    # filter for current release range and artifact
+                    # filter for current release range
                     WHERE p.name = '%s'
                     AND p.analysisMethod = '%s'
                     AND l2.tag = '%s'

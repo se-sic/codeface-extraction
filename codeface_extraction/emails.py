@@ -12,19 +12,19 @@ def __select_emails(dbm, project, tagging):
 
                     FROM project p
 
+                    # get mails for project
                     JOIN mail m
+                    ON p.id = m.projectId
 
-                    ON p.id = m.projectId 
+                    # add authors/developers/persons
+                    JOIN person a
+                    ON m.author = a.id
 
-                    JOIN person a 
-
-                    ON m.author=a.id
-
+                    # filter for current project
                     WHERE p.name = '%s'
-
                     AND p.analysisMethod = '%s'
 
-                    ORDER BY authorName, creationDate
+                    ORDER BY authorName, m.creationDate
 
                     # LIMIT 10
                 """ %

@@ -13,27 +13,18 @@ def __select_artifacts_per_commit(dbm, project, tagging, revision, entitytype="F
                     FROM project p
 
                     # get release range for projects
-                    JOIN release_range r
-                    ON p.id = r.projectId
+                    JOIN release_range r ON p.id = r.projectId
 
                     # start of range
-                    JOIN release_timeline l1
-                    ON r.releaseStartId = l1.id
+                    JOIN release_timeline l1 ON r.releaseStartId = l1.id
                     # end of range
-                    JOIN release_timeline l2
-                    ON r.releaseEndId = l2.id
+                    JOIN release_timeline l2 ON r.releaseEndId = l2.id
 
                     # add commits for the ranges
-                    JOIN commit c
-                    on r.id = c.releaseRangeId
+                    JOIN commit c on r.id = c.releaseRangeId
 
                     # add meta-data for commits
-                    JOIN commit_dependency cd
-                    ON c.id = cd.commitId
-
-                    # add authors/developers/persons
-                    JOIN person pers
-                    ON c.author = pers.id
+                    JOIN commit_dependency cd ON c.id = cd.commitId
 
                     # filter for current release range and artifact
                     WHERE p.name = '%s'
@@ -41,7 +32,7 @@ def __select_artifacts_per_commit(dbm, project, tagging, revision, entitytype="F
                     AND l2.tag = '%s'
                     AND cd.entityType = '%s'
 
-                    ORDER BY c.id, cd.entityId
+                    ORDER BY c.id, artifact
 
                     # LIMIT 10
                 """ %

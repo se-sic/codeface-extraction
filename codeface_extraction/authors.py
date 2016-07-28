@@ -16,7 +16,7 @@ def __select_list_of_authors(dbm, project):
                     JOIN person pers
                     ON p.id = pers.projectId
 
-                    # filter for current release range and artifact
+                    # filter for current project
                     WHERE p.name = '%s'
 
                     ORDER BY pers.id ASC

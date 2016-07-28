@@ -13,23 +13,18 @@ def __select_mailing_authors(dbm, project, tagging, revision):
                     FROM project p
 
                     # get release range for projects
-                    JOIN release_range r
-                    ON p.id = r.projectId
+                    JOIN release_range r ON p.id = r.projectId
 
                     # start of range
-                    JOIN release_timeline l1
-                    ON r.releaseStartId = l1.id
+                    JOIN release_timeline l1 ON r.releaseStartId = l1.id
                     # end of range
-                    JOIN release_timeline l2
-                    ON r.releaseEndId = l2.id
+                    JOIN release_timeline l2 ON r.releaseEndId = l2.id
 
                     # add e-mail data
-                    JOIN mail m
-                    ON p.id = m.projectId
+                    JOIN mail m ON p.id = m.projectId
 
                     # add authors/developers/persons
-                    JOIN person pers
-                    ON m.author = pers.id
+                    JOIN person pers ON m.author = pers.id
 
                     # filter for current release range and artifact
                     WHERE p.name = '%s'

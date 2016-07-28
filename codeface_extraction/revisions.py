@@ -12,13 +12,12 @@ def __select_list_of_revisions(dbm, project):
 
                     FROM project p
 
-                    # add authors/developers/persons
-                    JOIN release_timeline t
-                    ON p.id = t.projectId
+                    # add releases
+                    JOIN release_timeline t ON p.id = t.projectId
 
-                    # filter for current release range and artifact
+                    # filter for releases
                     WHERE p.name = '%s'
-                    and t.type = 'release'
+                    AND t.type = 'release'
 
                     ORDER BY t.id ASC
 
