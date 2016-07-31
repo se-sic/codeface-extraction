@@ -50,7 +50,8 @@ def get_list_of_emails(dbm, project, tagging, project_resdir):
     emails = __select_emails(dbm, project, tagging)
 
     # convert emails to tuples
-    lines = ["{}; {}; {}\n".format(authorName, creationDate, threadId ) for authorName, creationDate, threadId in emails]
+    lines = ["{}; {}; {}; {}; {}\n".format(authorName, email1, creationDate, subject, threadId ) 
+                                       for authorName, email1, creationDate, subject, threadId in emails]
 
     # write lines to file
     outfile = pathjoin(project_resdir, "emails.list")
