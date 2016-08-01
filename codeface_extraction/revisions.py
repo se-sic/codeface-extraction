@@ -3,6 +3,8 @@
 This file provides the needed functions for the authors extraction.
 """
 
+import csv_writer
+
 from os.path import join as pathjoin
 
 
@@ -44,16 +46,13 @@ def get_list_of_revisions(dbm, project, project_resdir):
 
     # get revisions for given project
     list_of_revisions = __select_list_of_revisions(dbm, project)
-    list_of_revisions = [rev for (rev,) in list_of_revisions]
 
-    # convert to a proper list for file writing
-    lines = ["{}\n".format(rev) for rev in list_of_revisions]
+    # reduce the extracted list (if needed)
+    lines = list_of_revisions
 
     # write lines to file
     outfile = pathjoin(project_resdir, "revisions.list")
-    f = open(outfile, 'w')
-    f.writelines(lines)
-    f.close()
+    csv_writer.write_to_csv(outfile, lines)
 
     # return the list of revisions for use in other parts of system
-    return list_of_revisions
+    return [rev for (rev,) in list_of_revisions]

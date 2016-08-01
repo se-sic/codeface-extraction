@@ -3,6 +3,8 @@
 This file provides the needed functions for the author-email extraction.
 """
 
+import csv_writer
+
 from os.path import join as pathjoin
 
 
@@ -58,12 +60,9 @@ def get_mailing_authors(dbm, project, tagging, end_rev, range_resdir):
     # get list of authors and the threads they contribute to
     author2author = __select_mailing_authors(dbm, project, tagging, end_rev)
 
-    # convert the list to proper csv
-    lines = ["{}; {}\n".format(thread, dev_name) for dev_id, dev_name, thread in author2author]
+    # reduce the extracted list (if needed)
+    lines = [(thread, dev_name) for dev_id, dev_name, thread in author2author]
 
     # write lines to file for current kind of artifact
-    # fixme use a separate mail folder?!
     outfile = pathjoin(range_resdir, "thread2authors.list")
-    f = open(outfile, 'w')
-    f.writelines(lines)
-    f.close()
+    csv_writer.write_to_csv(outfile, lines)

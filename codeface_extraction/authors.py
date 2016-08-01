@@ -3,6 +3,8 @@
 This file provides the needed functions for the authors extraction.
 """
 
+import csv_writer
+
 from os.path import join as pathjoin
 
 
@@ -43,11 +45,9 @@ def get_list_of_authors(dbm, project, project_resdir):
     # get authors for given project
     list_of_authors = __select_list_of_authors(dbm, project)
 
-    # convert to a proper list for file writing
-    lines = ["{}; {}\n".format(dev_id, dev_name) for dev_id, dev_name in list_of_authors]
+    # reduce the extracted list (if needed)
+    lines = list_of_authors
 
     # write lines to file
     outfile = pathjoin(project_resdir, "authors.list")
-    f = open(outfile, 'w')
-    f.writelines(lines)
-    f.close()
+    csv_writer.write_to_csv(outfile, lines)

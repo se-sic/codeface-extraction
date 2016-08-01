@@ -3,6 +3,8 @@
 This file provides the needed functions for the email extraction.
 """
 
+import csv_writer
+
 from os.path import join as pathjoin
 
 
@@ -49,12 +51,9 @@ def get_list_of_emails(dbm, project, tagging, project_resdir):
     # get email information
     emails = __select_emails(dbm, project, tagging)
 
-    # convert emails to tuples
-    lines = ["{}; {}; {}; {}; {}\n".format(authorName, email1, creationDate, subject, threadId ) 
-                                       for authorName, email1, creationDate, subject, threadId in emails]
+    # reduce the extracted list (if needed)
+    lines = emails
 
     # write lines to file
     outfile = pathjoin(project_resdir, "emails.list")
-    f = open(outfile, 'w')
-    f.writelines(lines)
-    f.close()
+    csv_writer.write_to_csv(outfile, lines)

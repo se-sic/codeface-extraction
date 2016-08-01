@@ -3,6 +3,8 @@
 This file provides the needed functions for the artifacts-commit extraction.
 """
 
+import csv_writer
+
 from os.path import join as pathjoin
 
 
@@ -60,11 +62,9 @@ def get_cochanged_artifacts(dbm, project, tagging, end_rev, artifact, range_resd
     # get list of changed artifacts per author
     commit2artifact = __select_artifacts_per_commit(dbm, project, tagging, end_rev, artifact)
 
-    # convert c2a to tuples (commit, artifact)
-    lines = ["{}; {}\n".format(commit_id, art) for commit_id, art in commit2artifact]
+    # reduce the extracted list (if needed)
+    lines = commit2artifact
 
     # write lines to file for current kind of artifact
     outfile = pathjoin(range_resdir, "commit2" + artifact.lower() + ".list")
-    f = open(outfile, 'w')
-    f.writelines(lines)
-    f.close()
+    csv_writer.write_to_csv(outfile, lines)

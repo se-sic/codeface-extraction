@@ -3,6 +3,8 @@
 This file provides the needed functions for the commit extraction.
 """
 
+import csv_writer
+
 from os.path import join as pathjoin
 
 
@@ -55,15 +57,9 @@ def get_list_of_commits(dbm, project, tagging, project_resdir):
     # get commit information
     commits = __select_commits(dbm, project, tagging)
 
-    # convert commits to tuples
-    lines = ["{}; {}; {}; {}; {}; {}; {}; {}; {}; {}; {}; {}; {}\n".format(commitId, authorDate, name,
-                           email1, commitHash, ChangedFiles, AddedLines, DeletedLines, DiffSize,
-                           file, entityId, entityType, size) for commitId, authorDate, name,
-                           email1, commitHash, ChangedFiles, AddedLines, DeletedLines, DiffSize,
-                           file, entityId, entityType, size in commits]
+    # reduce the extracted list (if needed)
+    lines = commits
 
     # write lines to file
     outfile = pathjoin(project_resdir, "commits.list")
-    f = open(outfile, 'w')
-    f.writelines(lines)
-    f.close()
+    csv_writer.write_to_csv(outfile, lines)

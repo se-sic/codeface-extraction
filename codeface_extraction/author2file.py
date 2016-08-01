@@ -3,6 +3,8 @@
 This file provides the needed functions for the authors extraction.
 """
 
+import csv_writer
+
 from os.path import join as pathjoin
 
 
@@ -62,11 +64,9 @@ def get_files_per_author(dbm, project, tagging, end_rev, range_resdir):
     # get artifact information per author
     authors_to_artifacts = __select_files_per_author(dbm, project, tagging, end_rev)
 
-    # convert a2a to tuples (id, artifact)
-    lines = ["{}; {}\n".format(dev_name, filename) for dev_id, dev_name, filename in authors_to_artifacts]
+    # reduce the extracted list (if needed)
+    lines = [(dev_name, filename) for dev_id, dev_name, filename in authors_to_artifacts]
 
     # write lines to file
     outfile = pathjoin(range_resdir, "author2file.list")
-    f = open(outfile, 'w')
-    f.writelines(lines)
-    f.close()
+    csv_writer.write_to_csv(outfile, lines)
