@@ -227,16 +227,13 @@ class CommitExtraction(Extraction):
                     FROM project p
 
                     # get commits for project
-                    JOIN commit c
-                    ON p.id = c.projectId
+                    JOIN commit c ON p.id = c.projectId
 
                     # get commit meta-data
-                    JOIN commit_dependency cd
-                    ON c.id = cd.commitId
+                    JOIN commit_dependency cd ON c.id = cd.commitId
 
                     # add authors/developers/persons
-                    JOIN person a
-                    ON c.author = a.id
+                    JOIN person a ON c.author = a.id
 
                     # filter for current project
                     WHERE p.name = '{project}'
@@ -261,12 +258,10 @@ class EmailExtraction(Extraction):
                     FROM project p
 
                     # get mails for project
-                    JOIN mail m
-                    ON p.id = m.projectId
+                    JOIN mail m ON p.id = m.projectId
 
                     # add authors/developers/persons
-                    JOIN person a
-                    ON m.author = a.id
+                    JOIN person a ON m.author = a.id
 
                     # filter for current project
                     WHERE p.name = '{project}'
