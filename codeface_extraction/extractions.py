@@ -510,3 +510,86 @@ class Thread2AuthorExtraction(Extraction):
 
     def _reduce_result(self, result):
         return [(thread, dev_name) for dev_id, dev_name, thread in result]
+
+
+class CommitRangeExtraction(Extraction):
+    """This is basically the CommitExtraction, but for one range only."""
+    def __init__(self, dbm, conf, resdir):
+        Extraction.__init__(self, dbm, conf, resdir)
+
+        self.file_name = "commits.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT c.id, c.authorDate, a.name, a.email1, c.commitHash,
+                           c.ChangedFiles, c.AddedLines, c.DeletedLines, c.DiffSize,
+                           cd.file, cd.entityId, cd.entityType, cd.size
+
+                    FROM project p
+
+                    # get release range for projects
+                    JOIN release_range r ON p.id = r.projectId
+
+                    # start of range
+                    JOIN release_timeline l1 ON r.releaseStartId = l1.id
+                    # end of range
+                    JOIN release_timeline l2 ON r.releaseEndId = l2.id
+
+                    # add commits for the ranges
+                    JOIN commit c ON p.id = c.projectId
+
+                    # get commit meta-data
+                    JOIN commit_dependency cd ON c.id = cd.commitId
+
+                    # add authors/developers/persons
+                    JOIN person a ON c.author = a.id
+
+                    # filter for current project
+                    WHERE p.name = '{project}'
+                    AND p.analysisMethod = '{tagging}'
+                    AND l2.tag = '{revision}'
+                    AND cd.entityType = '{entity_type}'
+
+                    ORDER BY c.authorDate, a.name, c.id, cd.file, cd.entityId
+
+                    # LIMIT 10
+                """
+
+
+class EmailRangeExtraction(Extraction):
+    """This is basically the EmailExtraction, but for one range only."""
+    def __init__(self, dbm, conf, resdir):
+        Extraction.__init__(self, dbm, conf, resdir)
+
+        self.file_name = "emails.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT a.name AS authorName, a.email1, m.creationDate, m.subject, m.threadId
+
+                    FROM project p
+
+                    # get release range for projects
+                    JOIN release_range r ON p.id = r.projectId
+
+                    # start of range
+                    JOIN release_timeline l1 ON r.releaseStartId = l1.id
+                    # end of range
+                    JOIN release_timeline l2 ON r.releaseEndId = l2.id
+
+                    # get mails for project
+                    JOIN mail m ON p.id = m.projectId
+
+                    # add authors/developers/persons
+                    JOIN person a ON m.author = a.id
+
+                    # filter for current release range and artifact
+                    WHERE p.name = '{project}'
+                    AND p.analysisMethod = '{tagging}'
+                    AND l2.tag = '{revision}'
+                    AND m.creationDate BETWEEN l1.date AND l2.date
+
+                    ORDER BY m.threadId, m.creationDate ASC
+
+                    # LIMIT 10
+                """
