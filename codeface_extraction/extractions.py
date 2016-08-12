@@ -536,7 +536,7 @@ class CommitRangeExtraction(Extraction):
                     JOIN release_timeline l2 ON r.releaseEndId = l2.id
 
                     # add commits for the ranges
-                    JOIN commit c ON p.id = c.projectId
+                    JOIN commit c ON r.id = c.releaseRangeId
 
                     # get commit meta-data
                     JOIN commit_dependency cd ON c.id = cd.commitId
