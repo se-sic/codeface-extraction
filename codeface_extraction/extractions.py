@@ -512,6 +512,32 @@ class Thread2AuthorExtraction(Extraction):
         return [(thread, dev_name) for dev_id, dev_name, thread in result]
 
 
+class AuthorRangeExtraction(Extraction):
+    def __init__(self, dbm, conf, resdir):
+        Extraction.__init__(self, dbm, conf, resdir)
+
+        self.file_name = "authors.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT pers.id AS id, pers.name AS name
+
+                    FROM project p
+
+                    # add authors/developers/persons
+                    JOIN person pers
+                    ON p.id = pers.projectId
+
+                    # filter for current project
+                    WHERE p.name = '{project}'
+                    # {revision} ## hack to get range-level extraction
+
+                    ORDER BY pers.id ASC
+
+                    # LIMIT 10
+                """
+
+
 class CommitRangeExtraction(Extraction):
     """This is basically the CommitExtraction, but for one range only."""
     def __init__(self, dbm, conf, resdir):
