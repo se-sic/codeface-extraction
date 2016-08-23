@@ -267,7 +267,7 @@ class EmailExtraction(Extraction):
                     WHERE p.name = '{project}'
                     AND p.analysisMethod = '{tagging}'
 
-                    ORDER BY authorName, m.creationDate
+                    ORDER BY m.threadId, m.creationDate ASC
 
                     # LIMIT 10
                 """
