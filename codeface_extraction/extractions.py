@@ -253,7 +253,8 @@ class EmailExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT a.name AS authorName, a.email1, m.messageId, m.creationDate, m.subject, m.threadId
+                    SELECT a.name AS authorName, a.email1, m.messageId, m.creationDate, m.creationDateOffset,
+                           m.subject, m.threadId
 
                     FROM project p
 
@@ -385,7 +386,8 @@ class EmailRangeExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT a.name AS authorName, a.email1, m.messageId, m.creationDate, m.subject, m.threadId
+                    SELECT a.name AS authorName, a.email1, m.messageId, m.creationDate, m.creationDateOffset,
+                           m.subject, m.threadId
 
                     FROM project p
 
