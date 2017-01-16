@@ -61,6 +61,8 @@ def run_extraction(conf, resdir):
         for extraction in __extractions_range:
             extraction.run(start_rev, end_rev)
 
+    log.info("Extraction complete!")
+
 
 def get_parser():
     """
