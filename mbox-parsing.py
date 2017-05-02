@@ -1,7 +1,7 @@
 import mailbox
 from joblib import Parallel, delayed
 from whoosh.fields import Schema, TEXT, ID
-from whoosh.index import create_in, open_dir
+from whoosh.index import create_in, open_dir, exists_in
 from whoosh.qparser import QueryParser
 from codeface.configuration import Configuration
 from os.path import abspath
@@ -21,7 +21,7 @@ def parse(mbox_name, results, include_filepath):
     # TODO can lead to problems if the index needs to be updated or creation was aborted.
     my_schema = Schema(messageID=ID(stored=True), content=TEXT)
     index_path = results + "/index"
-    if not os.path.exists(index_path):
+    if not os.path.exists(index_path) and not exists_in(index_path):
         log.info("Creating Index in results folder for text search.")
         os.mkdir(index_path)
         ix = create_in(index_path, my_schema)
