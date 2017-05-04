@@ -103,18 +103,14 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--filepath', help="Include the filepath in the search", action="store_true")
     parser.add_argument('resdir', help="Directory to store analysis results in")
     parser.add_argument('maildir', help='Direcotry in which the mailinglists are located')
-    parser.add_argument('projectname', help='Name of the project')
-    parser.add_argument('tagging', help='Current tagging of the analysis')
 
     args = parser.parse_args(sys.argv[1:])
     __resdir = abspath(args.resdir)
     __maildir = abspath(args.maildir)
-    __project = args.projectname
-    __tagging = args.tagging
     __codeface_conf, __project_conf = map(abspath, (args.config, args.project))
 
     __conf = Configuration.load(__codeface_conf, __project_conf)
 
     for ml in __conf["mailinglists"]:
-        parse(__maildir + "/" + ml["name"] + ".mbox", __resdir + "/" + __project + "_" + __tagging + "/" + __tagging,
+        parse(__maildir + "/" + ml["name"] + ".mbox", __resdir + "/" + __conf["repo"] + "_" + __conf["tagging"] + "/" + __conf["tagging"],
               args.filepath)
