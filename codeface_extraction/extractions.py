@@ -282,7 +282,7 @@ class RevisionExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT tag AS revision
+                    SELECT tag AS revision, t.date AS date
 
                     FROM project p
 
@@ -301,7 +301,7 @@ class RevisionExtraction(Extraction):
     def get_list(self):
         result = self._run_sql(None, None)
         lines = self._reduce_result(result)
-        return [rev for (rev,) in lines]
+        return [rev for (rev,date) in lines]
 
 
 #
