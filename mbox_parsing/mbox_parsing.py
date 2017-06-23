@@ -66,6 +66,7 @@ def parse(mbox_name, results, include_filepath):
     log.devinfo("Writing done and file closed.")
 
 
+# part.get_content_type() == 'text/plain' or message.get_content_type() == 'text/html'
 # Getting plain text 'email body'.
 def getbody(message):
     body = None
@@ -73,12 +74,18 @@ def getbody(message):
         for part in message.walk():
             if part.is_multipart():
                 for subpart in part.walk():
-                    if subpart.get_content_type() == 'text/plain':
+                    if 'text/' in subpart.get_content_type():
                         body = subpart.get_payload(decode=True)
-            elif part.get_content_type() == 'text/plain':
+            elif 'text/' in part.get_content_type():
                 body = part.get_payload(decode=True)
-    elif message.get_content_type() == 'text/plain':
+    elif 'text/' in message.get_content_type():
         body = message.get_payload(decode=True)
+
+    if body is None:
+        log.devinfo(message.get_content_type())
+        log.devinfo(
+            "An image or some other content that can not be indexed has been found. Message is given an empty body.")
+        body = ' '
     return unicode(body, errors="replace")
 
 
