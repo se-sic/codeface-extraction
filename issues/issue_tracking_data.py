@@ -101,7 +101,6 @@ def insert_user_data(issues, project_id, __conf):
             elif event["ref_target"] != "":
                 event["ref_target"] = user_buffer[event["ref_target"]["username"]]
 
-
         # check database for issue authors
         if issue["user"]["username"] not in user_buffer:
             issue["user"] = check_user(issue["user"], project_id, __conf)
@@ -151,9 +150,12 @@ def print_to_disk(issues, file_path):
                 output_file.write('"{}"'.format(issue["created_at"]) + ";")
                 output_file.write('"{}"'.format(issue["closed_at"]) + ";")
                 output_file.write(str(issue["isPullRequest"]) + ";")
-                output_file.write('"{}"'.format((event["user"]["name"] + ";").encode("utf-8")))
+                output_file.write('"{}"'.format((event["user"]["name"]).encode("ascii", errors='ignore')) + ";")
+                output_file.write('"{}"'.format((event["user"]["email"]).encode("ascii", errors='ignore')) + ";")
+                if event["created_at"] is "":
+                    print event
                 output_file.write('"{}"'.format(event["created_at"]) + ";")
-                output_file.write(('"{}"'.format("") if event["ref_target"] == ""
-                                   else '"{}"'.format((event["ref_target"]["name"]).encode("utf-8"))) + ";")
+                output_file.write(('"{}"'.format("") if event["ref_target"] == "" else
+                                   '"{}"'.format((event["ref_target"]["name"]).encode("ascii", errors='ignore'))) + ";")
                 output_file.write('"{}"'.format(event["event"]))
                 output_file.write("\n")
