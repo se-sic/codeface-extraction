@@ -1,4 +1,5 @@
 import argparse
+import csv
 import httplib
 import json
 import sys
@@ -23,7 +24,6 @@ def run():
     __resdir = abspath(args.resdir + "/" + __conf['repo'] + "_issues")
     project_id = _dbm.getProjectID(__conf["project"], __conf["tagging"])
     issues = load(__resdir)
-    time.sleep(2)
     issues = reformat(issues)
     issues = insert_user_data(issues, project_id, __conf)
     print_to_disk(issues, __resdir)
@@ -142,20 +142,13 @@ def check_user(user, project_id, __conf):
 
 
 def print_to_disk(issues, file_path):
-    with open(file_path + "/issues.list", 'w+') as output_file:
+    with open(file_path + "/issues.list", 'wb') as output_file:
+        wr = csv.writer(output_file, delimiter=';', lineterminator='\n', quoting=csv.QUOTE_NONNUMERIC)
         for issue in issues:
             for event in issue["eventsList"]:
-                output_file.write((str(issue["number"]) + ";"))
-                output_file.write('"{}"'.format(issue["state"]) + ";")
-                output_file.write('"{}"'.format(issue["created_at"]) + ";")
-                output_file.write('"{}"'.format(issue["closed_at"]) + ";")
-                output_file.write(str(issue["isPullRequest"]) + ";")
-                output_file.write('"{}"'.format((event["user"]["name"]).encode("ascii", errors='ignore')) + ";")
-                output_file.write('"{}"'.format((event["user"]["email"]).encode("ascii", errors='ignore')) + ";")
-                if event["created_at"] is "":
-                    print event
-                output_file.write('"{}"'.format(event["created_at"]) + ";")
-                output_file.write(('"{}"'.format("") if event["ref_target"] == "" else
-                                   '"{}"'.format((event["ref_target"]["name"]).encode("ascii", errors='ignore'))) + ";")
-                output_file.write('"{}"'.format(event["event"]))
-                output_file.write("\n")
+                wr.writerow((
+                    issue["number"], issue["state"], issue["created_at"], issue["closed_at"], issue["isPullRequest"],
+                    (event["user"]["name"]).encode("utf-8"), (event["user"]["email"]).encode("utf-8"),
+                    event["created_at"],
+                    "" if event["ref_target"] == "" else (event["ref_target"]["name"]).encode("utf-8"),
+                    event["event"]))
