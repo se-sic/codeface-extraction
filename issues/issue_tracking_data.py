@@ -64,15 +64,11 @@ def reformat(issues):
         issue["eventsList"] = issue["commentsList"] + issue["eventsList"]
 
         # remove events without user
+        event_list = []
         for event in issue["eventsList"]:
-            if event["user"] is None:
-                issue["eventsList"].remove(event)
-
-    # TODO this has to be changed. Should work without the block above but doesn't.
-    for issue in issues:
-        for event in issue["eventsList"]:
-            if event["user"] is None:
-                issue["eventsList"].remove(event)
+            if not (event["user"] is None or event["ref_target"] is None):
+                event_list.append(event)
+        issue["eventsList"] = event_list
 
     return issues
 
@@ -94,7 +90,6 @@ def insert_user_data(issues, project_id, __conf):
                 user_buffer[event["user"]["username"]] = event["user"]
             else:
                 event["user"] = user_buffer[event["user"]["username"]]
-
             if event["ref_target"] != "" and event["ref_target"]["username"] not in user_buffer:
                 event["ref_target"] = check_user(event["ref_target"], project_id, __conf)
                 user_buffer[event["ref_target"]["username"]] = event["ref_target"]
@@ -129,7 +124,7 @@ def check_user(user, project_id, __conf):
         params = urllib.urlencode({"projectID": project_id, "name": name, "email": mail})
         conn.request("POST", "/post_user_id", params, headers)
         response = conn.getresponse()
-        user_id = response.read()
+        user_id = json.loads(response.read())
     url = "/getUser/" + str(user_id["id"])
     conn.request("GET", url, headers=headers)
     response = conn.getresponse()
