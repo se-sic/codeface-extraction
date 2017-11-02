@@ -12,4 +12,12 @@ def write_to_csv(file_path, lines):
     # write lines to file for current kind of artifact
     with open(file_path, 'wb') as csv_file:
         wr = csv.writer(csv_file, delimiter=';', lineterminator='\n', quoting=csv.QUOTE_NONNUMERIC)
-        wr.writerows(lines)
+        for line in lines:
+            lineres = ()
+            for column in line:
+                print type(column)
+                if type(column) is unicode:
+                    lineres += (column.encode("utf-8"),)
+                else:
+                    lineres += (column,)
+            wr.writerow(lineres)
