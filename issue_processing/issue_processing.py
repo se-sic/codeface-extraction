@@ -11,22 +11,6 @@ from codeface.dbmanager import DBManager
 
 
 def run():
-    parser = argparse.ArgumentParser(prog='codeface', description='Codeface extraction')
-    parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
-    parser.add_argument('-p', '--project', help="Project configuration file", required=True)
-    parser.add_argument('-f', '--filepath', help="Include the filepath in the search", action="store_true")
-    parser.add_argument('-r', '--reindex', help="Re-construct the index", action="store_true")
-    parser.add_argument('resdir', help="Directory to store analysis results in")
-    parser.add_argument('maildir', help='Directory in which the mailinglists are located')
-
-    args = parser.parse_args(sys.argv[1:])
-    __resdir = os.path.abspath(args.resdir)
-    __maildir = os.path.abspath(args.maildir)
-    __codeface_conf, __project_conf = map(os.path.abspath, (args.config, args.project))
-
-    __conf = Configuration.load(__codeface_conf, __project_conf)
-    __resdir_project = os.path.join(__resdir, __conf["project"], __conf["tagging"])
-
     # Get all needed paths and argument for the method call.
     parser = argparse.ArgumentParser(prog='codeface', description='Codeface extraction')
     parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
