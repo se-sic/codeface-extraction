@@ -1,5 +1,5 @@
 # coding=utf-8
 
-import issue_processing.issue_processing
+import issue_processing.issue_processing as issues
 
-issue_processing.run()
+issues.run()

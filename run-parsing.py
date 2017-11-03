@@ -1,5 +1,5 @@
 # coding=utf-8
 
-import mbox_parsing.mbox_parsing
+import mbox_parsing.mbox_parsing as parsing
 
-mbox_parsing.run()
+parsing.run()
