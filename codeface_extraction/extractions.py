@@ -3,11 +3,12 @@
 This file provides the class 'Extraction' and all of its subclasses.
 """
 
-import csv_writer
 import itertools
 import os
 
 from codeface.cli import log
+
+from csv_writer import csv_writer
 
 
 #

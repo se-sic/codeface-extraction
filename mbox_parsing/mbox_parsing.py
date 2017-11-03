@@ -13,7 +13,7 @@ from joblib import Parallel, delayed
 from whoosh.fields import Schema, TEXT, ID
 from whoosh.qparser import QueryParser
 
-from codeface_extraction import csv_writer
+from csv_writer import csv_writer
 
 
 def __get_index(mbox, results_folder, schema, reindex):
