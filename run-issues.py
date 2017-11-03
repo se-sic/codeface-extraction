@@ -1,5 +1,5 @@
 # coding=utf-8
 
-import issues.issue_tracking_data as issue_tracking
+import issue_processing.issue_processing
 
-issue_tracking.run()
+issue_processing.run()

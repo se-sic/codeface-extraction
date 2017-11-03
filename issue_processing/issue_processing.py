@@ -2,12 +2,10 @@ import argparse
 import csv
 import httplib
 import json
+import os
 import sys
-import time
 import urllib
-from os.path import abspath
 
-from codeface.cli import log
 from codeface.configuration import Configuration
 from codeface.dbmanager import DBManager
 
@@ -16,22 +14,42 @@ def run():
     parser = argparse.ArgumentParser(prog='codeface', description='Codeface extraction')
     parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
     parser.add_argument('-p', '--project', help="Project configuration file", required=True)
+    parser.add_argument('-f', '--filepath', help="Include the filepath in the search", action="store_true")
+    parser.add_argument('-r', '--reindex', help="Re-construct the index", action="store_true")
     parser.add_argument('resdir', help="Directory to store analysis results in")
+    parser.add_argument('maildir', help='Directory in which the mailinglists are located')
+
     args = parser.parse_args(sys.argv[1:])
-    __codeface_conf, __project_conf = map(abspath, (args.config, args.project))
+    __resdir = os.path.abspath(args.resdir)
+    __maildir = os.path.abspath(args.maildir)
+    __codeface_conf, __project_conf = map(os.path.abspath, (args.config, args.project))
+
     __conf = Configuration.load(__codeface_conf, __project_conf)
+    __resdir_project = os.path.join(__resdir, __conf["project"], __conf["tagging"])
+
+    # Get all needed paths and argument for the method call.
+    parser = argparse.ArgumentParser(prog='codeface', description='Codeface extraction')
+    parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
+    parser.add_argument('-p', '--project', help="Project configuration file", required=True)
+    parser.add_argument('resdir', help="Directory to store analysis results in")
+
+    args = parser.parse_args(sys.argv[1:])
+    __codeface_conf, __project_conf = map(os.path.abspath, (args.config, args.project))
+
+    __conf = Configuration.load(__codeface_conf, __project_conf)
+    __resdir = os.path.abspath(os.path.join(args.resdir, __conf['repo'] + "_issues"))
+
     _dbm = DBManager(__conf)
-    __resdir = abspath(args.resdir + "/" + __conf['repo'] + "_issues")
     project_id = _dbm.getProjectID(__conf["project"], __conf["tagging"])
+
     issues = load(__resdir)
     issues = reformat(issues)
     issues = insert_user_data(issues, project_id, __conf)
     print_to_disk(issues, __resdir)
-    return None
 
 
 def load(file_path):
-    with open(file_path + "/issues.json") as issues_file:
+    with open(os.path.join(file_path, "issue_processing.json")) as issues_file:
         data = json.load(issues_file)
     return data
 
@@ -137,7 +155,7 @@ def check_user(user, project_id, __conf):
 
 
 def print_to_disk(issues, file_path):
-    with open(file_path + "/issues.list", 'wb') as output_file:
+    with open(file_path + "/issue_processing.list", 'wb') as output_file:
         wr = csv.writer(output_file, delimiter=';', lineterminator='\n', quoting=csv.QUOTE_NONNUMERIC)
         for issue in issues:
             for event in issue["eventsList"]:
