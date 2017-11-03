@@ -17,6 +17,15 @@ from codeface_extraction import csv_writer
 
 
 def __get_index(mbox, results_folder, schema, reindex):
+    """Initialize the search index (and create it, if needed
+
+    :param mbox: the file path to the mbox file to create the index for
+    :param results_folder: the folder to create the index folder in
+    :param schema: the schema for the to be created index
+    :param reindex: force reindexing if True
+    :return: the opened index object
+    """
+
     # create or load index:
     # 0) construct index path
     index_path = os.path.join(results_folder, "index")
@@ -47,17 +56,30 @@ def __get_index(mbox, results_folder, schema, reindex):
 
 # get the search terms from the commits.list file
 def __get_artifacts(results_folder):
+    """Get the list of artifacts from the list of commits ('commits.list' file)
+
+    :param results_folder: the results folder with the file 'commits.list'
+    :return: a set of tuples (file name, artifact)
+    """
+
     commit_set = set()
     with open(os.path.join(results_folder, "commits.list"), 'r') as commit_list:
         for commit in commit_list:
             commit_seperated = str.split(commit, ';')
             commit_set.add((commit_seperated[9], commit_seperated[10]))
+
     return commit_set
 
 
-# Getting plain text 'email body'.
 def __mbox_getbody(message):
+    """ Gett plain-text e-mail body for better searching.
+
+    :param message: the mbox message to process
+    :return: the unicode-encoded message body
+    """
+
     __text_indicator = "text/"
+
     body = None
     if message.is_multipart():
         for part in message.walk():
@@ -75,27 +97,54 @@ def __mbox_getbody(message):
         log.devinfo(
             "An image or some other content has been found that cannot be indexed. Message is given an empty body.")
         body = ' '
+
     return unicode(body, errors="replace")
 
 
-# Executes the search for one commit.
-def __parse_execute(commit, my_schema, ix, include_filepath):
+def __parse_execute(artifact, schema, index, include_filepath):
+    """ Execute the search for the given commit
+
+    :param artifact: the (file name, artifact) tuple to search for
+    :param schema: the search schema to use
+    :param index: the search index to use
+    :param include_filepath: indicator whether to use the 'file name' part of the artifact into account
+    :return: a match list of tuples (file name, artifact, message ID)
+    """
+
+    log.devinfo("Searching for artifact ({}, {})...".format(artifact[0][1:-1], artifact[1][1:-1]))
+
     result = []
-    with ix.searcher() as searcher:
-        query_parser = QueryParser("content", schema=my_schema)
+
+    with index.searcher() as searcher:
+        # initialize query parser
+        query_parser = QueryParser("content", schema=schema)
+
+        # construct query
         if include_filepath:
-            my_query = query_parser.parse(commit[0] + " AND " + commit[1])
+            my_query = query_parser.parse(artifact[0] + " AND " + artifact[1])
         else:
-            my_query = query_parser.parse(commit[1])
+            my_query = query_parser.parse(artifact[1])
+
+        # search!
         query_result = searcher.search(my_query, terms=True)
+
+        # construct result from query answer
         for r in query_result:
-            result_tuple = (commit[0][1:-1], commit[1][1:-1], r["messageID"])
+            result_tuple = (artifact[0][1:-1], artifact[1][1:-1], r["messageID"])
             result.append(result_tuple)
-        log.devinfo("Artifact " + commit[0][1:-1] + ", " + commit[1][1:-1] + " done!")
+
     return result
 
 
 def parse(mbox_name, results_folder, include_filepath, reindex):
+    """Parse the given mbox file with the commit information from the results folder.
+
+    :param mbox_name: the mbox file to search in
+    :param results_folder: the results folder for index and commit information
+    :param include_filepath: indicator whether to use the 'file name' part of the artifact into account
+    :param reindex: force reindexing if True
+    """
+
     # load mbox file
     mbox = mailbox.mbox(mbox_name)
 
@@ -133,7 +182,9 @@ def parse(mbox_name, results_folder, include_filepath, reindex):
 
 
 def run():
-    # Get all needed paths and argument for the method call.
+    """Run the mbox-parsing process"""
+
+    # get all needed paths and argument for the method call.
     parser = argparse.ArgumentParser(prog='codeface', description='Codeface extraction')
     parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
     parser.add_argument('-p', '--project', help="Project configuration file", required=True)
@@ -142,14 +193,17 @@ def run():
     parser.add_argument('resdir', help="Directory to store analysis results in")
     parser.add_argument('maildir', help='Directory in which the mailinglists are located')
 
+    # construct data paths
     args = parser.parse_args(sys.argv[1:])
     __resdir = abspath(args.resdir)
     __maildir = abspath(args.maildir)
     __codeface_conf, __project_conf = map(abspath, (args.config, args.project))
 
+    # initialize configuration
     __conf = Configuration.load(__codeface_conf, __project_conf)
     __resdir_project = os.path.join(__resdir, __conf["project"], __conf["tagging"])
 
+    # search the mailing lists
     for ml in __conf["mailinglists"]:
         mbox_file = os.path.join(__maildir, ml["name"] + ".mbox")
         parse(mbox_file, __resdir_project, args.filepath, args.reindex)
