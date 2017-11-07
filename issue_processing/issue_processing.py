@@ -41,6 +41,8 @@ def run():
     # 4) dump result to disk
     print_to_disk(issues, __resdir)
 
+    log.info("Issue processing complete!")
+
 
 def load(source_folder):
     """Load issues from disk.
@@ -54,7 +56,7 @@ def load(source_folder):
 
     # check if file exists and exit early if not
     if not os.path.exists(srcfile):
-        log.devinfo("Issue file '{}' does not exist! Exiting early...".format(srcfile))
+        log.info("Issue file '{}' does not exist! Exiting early...".format(srcfile))
         sys.exit(-1)
 
     with open(srcfile) as issues_file:
@@ -126,7 +128,7 @@ def insert_user_data(issues, conf):
     :return: the updated issue data
     """
 
-    log.devinfo("Re-arranging issues...")
+    log.info("Syncing users with ID service...")
 
     # create buffer for users
     user_buffer = dict()
@@ -197,7 +199,7 @@ def print_to_disk(issues, results_folder):
 
     # construct path to output file
     output_file = os.path.join(results_folder, "issues.list")
-    log.devinfo("Dumping output in file '{}'...".format(output_file))
+    log.info("Dumping output in file '{}'...".format(output_file))
 
     # construct lines of output
     lines = []

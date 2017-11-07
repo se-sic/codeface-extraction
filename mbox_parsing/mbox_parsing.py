@@ -158,11 +158,11 @@ def parse(mbox_name, results_folder, include_filepath, reindex):
     artifacts = __get_artifacts(results_folder)
 
     # parallelize execution call for the text search
-    log.devinfo("Start parsing...")
+    log.info("Start parsing...")
     num_cores = multiprocessing.cpu_count()
     csv_data = Parallel(n_jobs=num_cores - 1)(
         delayed(__parse_execute)(commit, schema, ix, include_filepath) for commit in artifacts)
-    log.devinfo("Parsing finished.")
+    log.info("Parsing finished.")
 
     # re-arrange results
     result = [('file', 'artifact', 'messageID')]
@@ -177,8 +177,10 @@ def parse(mbox_name, results_folder, include_filepath, reindex):
         output_file = os.path.join(results_folder, "mboxparsing.list")
 
     # Writes found hits to file.
-    log.devinfo("Writing results to file {}.".format(output_file))
+    log.info("Writing results to file {}.".format(output_file))
     csv_writer.write_to_csv(output_file, result)
+
+    log.info("Parsing mbox file complete!")
 
 
 def run():
