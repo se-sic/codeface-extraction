@@ -12,6 +12,7 @@ from codeface.configuration import Configuration
 from codeface.dbmanager import DBManager
 
 import extractions
+from csv_writer import csv_writer
 
 
 ##
@@ -32,7 +33,7 @@ def run_extraction(conf, resdir):
     dbm = DBManager(conf)
 
     # get all types of extractions, both project-level and range-level
-    __extractions_project, __extractions_range = extractions.get_extractions(dbm, conf, resdir)
+    __extractions_project, __extractions_range = extractions.get_extractions(dbm, conf, resdir, csv_writer)
 
     # run project-level extractions
     for extraction in __extractions_project:
@@ -40,7 +41,7 @@ def run_extraction(conf, resdir):
 
     # check if list of revisions in database is the same as in the config file
     revs = conf["revisions"]
-    list_of_revisions = extractions.RevisionExtraction(dbm, conf, resdir).get_list()
+    list_of_revisions = extractions.RevisionExtraction(dbm, conf, resdir, csv_writer).get_list()
     if revs:
         if set(revs) != set(list_of_revisions):
             log.error("List of revisions in configuration file do not match the list stored in the DB! Stopping now.")

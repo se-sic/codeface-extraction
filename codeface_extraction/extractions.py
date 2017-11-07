@@ -8,20 +8,18 @@ import os
 
 from codeface.cli import log
 
-from csv_writer import csv_writer
-
 
 #
 # GET EXTRACTIONS
 #
 
 
-def get_extractions(dbm, conf, resdir):
+def get_extractions(dbm, conf, resdir, csv_writer):
     # all extractions are sublcasses of Extraction:
     # instantiate them all!
     __extractions = []
     for cls in Extraction.__subclasses__():
-        __extractions.append(cls(dbm, conf, resdir))
+        __extractions.append(cls(dbm, conf, resdir, csv_writer))
 
     # group extractions by "project-levelness"
     __extractions_grouped = dict(
@@ -54,7 +52,7 @@ class Extraction(object):
         'proximity': ['Function']
     }
 
-    def __init__(self, dbm, conf, res_dir):
+    def __init__(self, dbm, conf, res_dir, csv_writer):
         """
         Initialize object variables from parameters.
 
@@ -73,6 +71,8 @@ class Extraction(object):
         self.file_name = ""
 
         self.sql = ""
+
+        self.csv_writer = csv_writer
 
     def is_project_level(self):
         """Check if this extraction is on project level (i.e., {revision} is not on the SQL statement)."""
@@ -150,14 +150,14 @@ class Extraction(object):
         # and return it
         return outfile
 
-    @staticmethod
-    def _write_export_file(lines, outfile):
+    def _write_export_file(self, lines, outfile):
         """
         Write the given lines to the file given by outfile.
         :param lines: the CSV lines to be written
         :param outfile: the output file
         """
-        csv_writer.write_to_csv(outfile, lines)
+
+        self.csv_writer.write_to_csv(outfile, lines)
 
     def run(self, start_revision=None, end_revision=None):
         """
@@ -189,8 +189,8 @@ class Extraction(object):
 #
 
 class AuthorExtraction(Extraction):
-    def __init__(self, dbm, conf, resdir):
-        Extraction.__init__(self, dbm, conf, resdir)
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
         self.file_name = "authors.list"
 
@@ -214,8 +214,8 @@ class AuthorExtraction(Extraction):
 
 
 class CommitExtraction(Extraction):
-    def __init__(self, dbm, conf, resdir):
-        Extraction.__init__(self, dbm, conf, resdir)
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
         self.file_name = "commits.list"
 
@@ -247,8 +247,8 @@ class CommitExtraction(Extraction):
 
 
 class EmailExtraction(Extraction):
-    def __init__(self, dbm, conf, resdir):
-        Extraction.__init__(self, dbm, conf, resdir)
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
         self.file_name = "emails.list"
 
@@ -276,8 +276,8 @@ class EmailExtraction(Extraction):
 
 
 class RevisionExtraction(Extraction):
-    def __init__(self, dbm, conf, resdir):
-        Extraction.__init__(self, dbm, conf, resdir)
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
         self.file_name = "revisions.list"
 
@@ -310,8 +310,8 @@ class RevisionExtraction(Extraction):
 #
 
 class AuthorRangeExtraction(Extraction):
-    def __init__(self, dbm, conf, resdir):
-        Extraction.__init__(self, dbm, conf, resdir)
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
         self.file_name = "authors.list"
 
@@ -337,8 +337,8 @@ class AuthorRangeExtraction(Extraction):
 
 class CommitRangeExtraction(Extraction):
     """This is basically the CommitExtraction, but for one range only."""
-    def __init__(self, dbm, conf, resdir):
-        Extraction.__init__(self, dbm, conf, resdir)
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
         self.file_name = "commits.list"
 
@@ -380,8 +380,8 @@ class CommitRangeExtraction(Extraction):
 
 class EmailRangeExtraction(Extraction):
     """This is basically the EmailExtraction, but for one range only."""
-    def __init__(self, dbm, conf, resdir):
-        Extraction.__init__(self, dbm, conf, resdir)
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
         self.file_name = "emails.list"
 
