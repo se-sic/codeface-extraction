@@ -196,7 +196,7 @@ class AuthorExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT pers.id AS id, pers.name AS name
+                    SELECT pers.id AS id, pers.name AS name, pers.email1 AS email
 
                     FROM project p
 
@@ -317,7 +317,7 @@ class AuthorRangeExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT pers.id AS id, pers.name AS name
+                    SELECT pers.id AS id, pers.name AS name, pers.email1 AS email
 
                     FROM project p
 
