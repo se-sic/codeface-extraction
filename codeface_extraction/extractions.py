@@ -221,8 +221,10 @@ class CommitExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT c.id, c.authorDate, a.name, a.email1, c.commitHash,
-                           c.ChangedFiles, c.AddedLines, c.DeletedLines, c.DiffSize,
+                    SELECT c.id,
+                           c.authorDate, a.name, a.email1,
+                           c.commitDate, acom.name, acom.email1,
+                           c.commitHash, c.ChangedFiles, c.AddedLines, c.DeletedLines, c.DiffSize,
                            cd.file, cd.entityId, cd.entityType, cd.size
 
                     FROM project p
@@ -235,6 +237,9 @@ class CommitExtraction(Extraction):
 
                     # add authors/developers/persons
                     JOIN person a ON c.author = a.id
+
+                    # add committers
+                    JOIN person acom ON c.committer = acom.id
 
                     # filter for current project
                     WHERE p.name = '{project}'
@@ -344,8 +349,10 @@ class CommitRangeExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT c.id, c.authorDate, a.name, a.email1, c.commitHash,
-                           c.ChangedFiles, c.AddedLines, c.DeletedLines, c.DiffSize,
+                    SELECT c.id,
+                           c.authorDate, a.name, a.email1,
+                           c.commitDate, acom.name, acom.email1,
+                           c.commitHash, c.ChangedFiles, c.AddedLines, c.DeletedLines, c.DiffSize,
                            cd.file, cd.entityId, cd.entityType, cd.size
 
                     FROM project p
@@ -366,6 +373,9 @@ class CommitRangeExtraction(Extraction):
 
                     # add authors/developers/persons
                     JOIN person a ON c.author = a.id
+
+                    # add committers
+                    JOIN person acom ON c.committer = acom.id
 
                     # filter for current project and range
                     WHERE p.name = '{project}'
