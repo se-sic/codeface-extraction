@@ -1,15 +1,10 @@
 import argparse
-import httplib
-import json
 import os
 import sys
-import urllib
 import time
 import csv
 
-from os import listdir
-from os.path import isfile, join
-from xml.dom.minidom import parse, parseString
+from xml.dom.minidom import parse
 from datetime import datetime
 
 from codeface.cli import log
@@ -35,40 +30,40 @@ def run():
     __conf = Configuration.load(__codeface_conf, __project_conf)
 
     # get source and results folders
-    folder = args.resdir
-    __srcdir = os.path.abspath(os.path.join(folder, __conf['repo'] + "_proximity", "conway", "issues_xml"))
+    __srcdir = os.path.abspath(os.path.join(args.resdir, __conf['repo'] + "_proximity", "conway", "issues_xml"))
     __resdir = os.path.abspath(os.path.join(args.resdir, __conf['project'], __conf["tagging"]))
+    __srcdir_csv = os.path.abspath(os.path.join(args.resdir, __conf['repo'] + "_proximity", "conway"))
 
-	# get person folder
-	#__psrcdir = os.path.abspath(os.path.join(folder, __conf['repo'] + "_proximity", "conway"))
+    # get person folder
+    # __psrcdir = os.path.abspath(os.path.join(args.resdir, __conf['repo'] + "_proximity", "conway"))
 
-    # run processing of issue data:
-	#yxz = load_csv(__psrcdir)
-    #persons = parse_csv(yxz)
-	
     # 1) load the list of issues
-    issues = load(__srcdir)
+    issues = load_xml(__srcdir)
+    # 1b) load the list of persons
+    persons = load_csv(__srcdir_csv)
     # 2) re-format the issues
-    issues = parse_xml(issues)
+    issues = parse_xml(issues, persons)
     # 3) update user data with Codeface database
+    # mabye not nessecary
     issues = insert_user_data(issues, __conf)
     # 4) dump result to disk
     print_to_disk(issues, __resdir)
     # 5) export for Gephi
     print_to_disk_gephi(issues, __resdir)
-    # 6) export for github issue extraction
+    # 6) export for jira issue extraction to use them in dev-network-growth
     print_to_disk_extr(issues, __resdir)
 
-    log.info("Issue processing complete!")
+    log.info("Jira issue processing complete!")
 
 
-def load(source_folder):
+def load_xml(source_folder):
     """Load issues from disk.
 
     :param source_folder: the folder where to find .xml-files
     :return: the loaded issue data
     """
-    filelist =  [f for f in os.listdir(source_folder) if isfile(join(source_folder, f))]
+
+    filelist = [f for f in os.listdir(source_folder) if os.path.isfile(os.path.join(source_folder, f))]
     issue_data = list()
     for file in filelist:
         srcfile = os.path.join(source_folder, file)
@@ -79,52 +74,35 @@ def load(source_folder):
             log.info("Issue file '{}' does not exist! Exiting early...".format(srcfile))
             sys.exit(-1)
 
-        #with open(srcfile, 'r') as issues_file:
+        # with open(srcfile, 'r') as issues_file:
         xmldoc = parse(srcfile)
         issue_data.append(xmldoc)
 
     return issue_data
 
 
-def load_csv(source_folder):
-    """Load persons from disk.
-
-    :param source_folder: the folder where to find .csv-file
-    :return: the loaded person data
-    """
-
-    srcfile = os.path.join(source_folder, "jira-comment-authors-with-email.csv")
-    log.devinfo("Loading person csv from file '{}'...".format(srcfile))
-
-     # check if file exists and exit early if not
-    if not os.path.exists(srcfile):
-        log.info("Person file '{}' does not exist! Exiting early...".format(srcfile))
-        sys.exit(-1)
-
-
-    person_data = list()
-     #with open(srcfile, 'r') as person_file:
-    with open(srcfile, 'r') as f:
-         person_data = csv.DictReader(f, delimiter=',', skipinitialspace=True)
-
-    return person_data
-
-
-def parse_csv(person_date):
-    for row in person_date:
-        print(row['AuthorID'], row['userEmail'])
-
-	return persons
-
-def parse_xml(issue_data):
+def parse_xml(issue_data, persons):
     """Parse issues from the xml-data
 
-        :param issue_data: xml-data
-        :return: the loaded issue data
-        """
+    :param issue_data: list of xml-files
+    :param persons: list of persons from JIRA (incl. e-mail addresses)
+    :return: list of parsed issues
+    """
 
-    log.devinfo("Parse issues...")
+    log.info("Parse jira issues...")
     issues = list()
+
+    def merge_user_with_user_from_csv(user, persons):
+        new_user = dict()
+        if user['username'] in persons.keys():
+            new_user['username'] = user['username']
+            new_user['name'] = persons.get(user['username'])[0]
+            new_user['email'] = persons.get(user['username'])[1]
+        else:
+            new_user = user
+            log.warning("User not in csv-file: " + str(user))
+        log.info("current User: " + str(user) + ",    new user: " + str(new_user))
+        return new_user
 
     log.debug("Number of files:" + str(len(issue_data)))
     for issue_file in issue_data:
@@ -136,21 +114,23 @@ def parse_xml(issue_data):
             comments = list()
             issue = dict()
 
-            #parse values form xml
-            #add issue values to the issue
+            # parse values form xml
+            # add issue values to the issue
             key = issue_x.getElementsByTagName('key')[0]
             issue['id'] = key.attributes['id'].value
             issue['externalId'] = key.firstChild.data
 
             created = issue_x.getElementsByTagName('created')[0]
             createDate = created.firstChild.data
-            issue['creationDate'] = datetime.strptime(createDate, '%a, %d %b %Y %H:%M:%S +0000')
+            d = datetime.strptime(createDate, '%a, %d %b %Y %H:%M:%S +0000')
+            issue['creationDate'] = d.strftime('%Y-%m-%d %H:%M:%S')
 
             resolved = issue_x.getElementsByTagName('resolved')
             issue['resolveDate'] = ""
-            if (len(resolved) > 0) and (not resolved[0] is None) :
+            if (len(resolved) > 0) and (not resolved[0] is None):
                 resolveDate = resolved[0].firstChild.data
-                issue['resolveDate'] = datetime.strptime(resolveDate, '%a, %d %b %Y %H:%M:%S +0000')
+                d = datetime.strptime(resolveDate, '%a, %d %b %Y %H:%M:%S +0000')
+                issue['resolveDate'] = d.strftime('%Y-%m-%d %H:%M:%S')
 
             link = issue_x.getElementsByTagName('link')[0]
             issue['url'] = link.firstChild.data
@@ -164,12 +144,12 @@ def parse_xml(issue_data):
             project = issue_x.getElementsByTagName('project')[0]
             issue['projectId'] = project.attributes['id'].value
 
-            assignee = issue_x.getElementsByTagName('reporter')[0]
+            reporter = issue_x.getElementsByTagName('reporter')[0]
             user = dict()
-            user["username"] = assignee.attributes['username'].value
-            user["name"] = assignee.attributes['username'].value	##assignee.firstChild.data
+            user["username"] = reporter.attributes['username'].value
+            user["name"] = reporter.firstChild.data
             user["email"] = ""
-            issue["user"] = user
+            issue["author"] = merge_user_with_user_from_csv(user, persons)
 
             issue['title'] = issue_x.getElementsByTagName('title')[0].firstChild.data
 
@@ -179,12 +159,13 @@ def parse_xml(issue_data):
                 comment['id'] = comment_x.attributes['id'].value
                 user = dict()
                 user["username"] = comment_x.attributes['author'].value
-                user["name"] = comment_x.attributes['author'].value   #not correct, it is the username
+                user["name"] = ""
                 user["email"] = ""
-                comment["author"] = user
+                comment["author"] = merge_user_with_user_from_csv(user, persons)
 
                 created = comment_x.attributes['created'].value
-                comment['changeDate'] = datetime.strptime(created, '%a, %d %b %Y %H:%M:%S +0000')
+                d = datetime.strptime(created, '%a, %d %b %Y %H:%M:%S +0000')
+                comment['changeDate'] = d.strftime('%Y-%m-%d %H:%M:%S')
 
                 comment['text'] = comment_x.firstChild.data
                 comment['issueId'] = issue['id']
@@ -198,25 +179,21 @@ def parse_xml(issue_data):
                 relation = dict()
                 relation['relation'] = rel.getElementsByTagName('name')[0].firstChild.data
 
-                #left = rel.getElementsByTagName('inwardlinks')
-                #right = rel.getElementsByTagName('outwardlinks')
+                if (rel.hasAttribute('inwardlinks')):
+                    left = rel.getElementsByTagName('inwardlinks')
+                    issuekeys = left.getElementsByTagName("issuekey")
+                    for key in issuekeys:
+                        relation['type'] = "inward"
+                        relation['id'] = key.firstChild.data
+                        relations.append(relation)
 
-                #if (not left is None):
-                #    issuekey = left.getElementsByTagName('issuekey')
-                #    if (not issuekey is None):
-                #        relation['leftIssueId'] = issuekey[0].attributes['id'].value
-
-                #    relation['rightIssueId'] = issue['id']
-
-                #if (not right is None):
-                #    issuekey = right.getElementsByTagName('issuekey')
-                #    if (not issuekey is None):
-                #        relation['rightIssueId'] = issuekey[0].attributes['id'].value
-
-                 #   relation['leftIssueId'] = issue["id"]
-
-                #TODO : relation['id']
-                relations.append(relation)
+                if (rel.hasAttribute('outwardlinks')):
+                    right = rel.getElementsByTagName('outwardlinks')
+                    issuekeys = right.getElementsByTagName('issuekey')
+                    for key in issuekeys:
+                        relation['type'] = "outward"
+                        relation['id'] = key.firstChild.data
+                        relations.append(relation)
 
             issue["relations"] = relations
             issues.append(issue)
@@ -233,8 +210,6 @@ def insert_user_data(issues, conf):
     """
 
     log.info("Syncing users with ID service...")
-
-	## auslesen aus csv-file
 
     # create buffer for users
     user_buffer = dict()
@@ -256,7 +231,7 @@ def insert_user_data(issues, conf):
             name = unicode(user["name"]).encode("utf-8")
         else:
             name = unicode(user["username"]).encode("utf-8")
-        mail = unicode(user["email"]).encode("utf-8")      #empty
+        mail = unicode(user["email"]).encode("utf-8")  # empty
         # construct string for ID service and send query
         user_string = get_user_string(name, mail)
 
@@ -283,15 +258,15 @@ def insert_user_data(issues, conf):
 
     for issue in issues:
         # check database for issue author
-        issue["user"] = get_or_update_user(issue["user"])
+        issue["author"] = get_or_update_user(issue["author"])
 
         # check database for event authors
         for comment in issue["comments"]:
             # get the event user from the DB
             comment["author"] = get_or_update_user(comment["author"])
             ## get the reference-target user from the DB if needed
-            #if event["ref_target"] != "":
-             #   event["ref_target"] = get_or_update_user(event["ref_target"])
+            # if event["ref_target"] != "":
+            #   event["ref_target"] = get_or_update_user(event["ref_target"])
 
     log.debug("number of issues after insert_user_data: '{}'".format(len(issues)))
     return issues
@@ -305,31 +280,31 @@ def print_to_disk(issues, results_folder):
     """
 
     # construct path to output file
-    output_file = os.path.join(results_folder, "jira-issues.list")
+    output_file = os.path.join(results_folder, "issues-jira.list")
     log.info("Dumping output in file '{}'...".format(output_file))
 
     # construct lines of output
     lines = []
     for issue in issues:
         log.info("Current issue '{}'".format(issue['externalId']))
-        lines.append((issue['user']['username'],
-                      issue['user']['email'],
+        lines.append((issue["author"]['name'],
+                      issue["author"]['email'],
                       issue['externalId'],
                       issue['creationDate'],
                       issue['externalId'],
                       issue['type']))
         for comment in issue["comments"]:
             lines.append((
-                comment['author']['username'],
+                comment['author']['name'],
                 comment['author']['email'],
                 comment["id"],
                 comment['changeDate'],
                 issue['externalId'],
                 "comment"
             ))
-
     # write to output file
     csv_writer.write_to_csv(output_file, lines)
+
 
 def print_to_disk_extr(issues, results_folder):
     """Print issues to file 'issues.list' in result folder
@@ -353,27 +328,28 @@ def print_to_disk_extr(issues, results_folder):
                 issue['creationDate'],
                 issue['resolveDate'],
                 False,  ## Value of is.pull.request
-                comment['author']['username'],
+                comment['author']['name'],
                 comment['author']['email'],
                 comment['changeDate'],
-                "",                             ## ref.name
-                "commented"                     ## event.name
+                "",  ## ref.name
+                "commented"  ## event.name
             ))
-
     # write to output file
     csv_writer.write_to_csv(output_file, lines)
 
 
 def print_to_disk_gephi(issues, results_folder):
-    """Print issues to file 'issues.list' in result folder
+    """Print issues to file 'issues-jira-gephi-nodes.csv' and
+    'issues-jira-gephi-edges.csv' in result folder. The files can be
+     used to build dynamic networks in Gephi.
 
     :param issues: the issues to dump
-    :param results_folder: the folder where to place 'issues.list' output file
+    :param results_folder: the folder where to place the two output file
     """
 
     # construct path to output file
-    output_file_nodes = os.path.join(results_folder, "issue_nodes.csv")
-    output_file_edges = os.path.join(results_folder, "issue_edges.csv")
+    output_file_nodes = os.path.join(results_folder, "issues-jira-gephi-nodes.csv")
+    output_file_edges = os.path.join(results_folder, "issues-jira-gephi-edges.csv")
     log.info("Dumping output in file '{}'...".format(output_file_nodes))
     log.info("Dumping output in file '{}'...".format(output_file_edges))
 
@@ -384,18 +360,44 @@ def print_to_disk_gephi(issues, results_folder):
     edge_lines.append(("Source", "Target", "Timestamp", "Edgetype"))
     for issue in issues:
         node_lines.append((issue['externalId'], "Issue"))
-        node_lines.append((issue['user']['username'], "Person"))
+        node_lines.append((issue["author"]['name'], "Person"))
 
-        edge_lines.append((issue['user']['username'], issue['externalId'], time.mktime(issue['creationDate'].timetuple()), "Person-Issue"))
+        edge_lines.append((issue["author"]['name'], issue['externalId'], issue['creationDate'], "Person-Issue"))
         for comment in issue["comments"]:
             node_lines.append((comment['id'], "Comment"))
-            node_lines.append((comment['author']['username'], "Person"))
+            node_lines.append((comment['author']['name'], "Person"))
 
-            edge_lines.append((issue['externalId'], comment['id'], time.mktime(comment['changeDate'].timetuple()),
+            edge_lines.append((issue['externalId'], comment['id'], comment['changeDate'],
                                "Issue-Comment"))
-            edge_lines.append((comment['author']['username'], comment['id'], time.mktime(comment['changeDate'].timetuple()),
+            edge_lines.append((comment['author']['name'], comment['id'], ['changeDate'],
                                "Person-Comment"))
-
     # write to output file
     csv_writer.write_to_csv(output_file_edges, edge_lines)
     csv_writer.write_to_csv(output_file_nodes, node_lines)
+
+
+## TODO: read, parse and use csv-data to find e-mail-adresses
+## unneeded right now
+def load_csv(source_folder):
+    """Load persons from disk.
+
+    :param source_folder: the folder where to find .csv-file
+    :return: the loaded person data
+    """
+    srcfile = os.path.join(source_folder, "jira-comment-authors-with-email.csv")
+    log.devinfo("Loading person csv from file '{}'...".format(srcfile))
+
+    # check if file exists and exit early if not
+    if not os.path.exists(srcfile):
+        log.error("Person file '{}' does not exist! Exiting early...".format(srcfile))
+        sys.exit(-1)
+
+        # with open(srcfile, 'r') as person_file:
+    with open(srcfile, 'r') as f:
+        person_data = csv.DictReader(f, delimiter=',', skipinitialspace=True)
+        persons = {}
+        for row in person_data:
+            if not row['AuthorID'] in persons.keys():
+                persons[row['AuthorID']] = (row['AuthorName'], row['userEmail'])
+
+    return persons
