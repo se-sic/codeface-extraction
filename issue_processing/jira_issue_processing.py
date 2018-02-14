@@ -96,10 +96,10 @@ def parse_xml(issue_data, persons):
 
     def merge_user_with_user_from_csv(user, persons):
         new_user = dict()
-        if user['username'] in persons.keys():
-            new_user['username'] = user['username']
-            new_user['name'] = persons.get(user['username'])[0]
-            new_user['email'] = persons.get(user['username'])[1]
+        if user['username'].lower() in persons.keys():
+            new_user['username'] = unicode(user['username'].lower()).encode('utf-8')
+            new_user['name'] = unicode(persons.get(user['username'].lower())[0]).encode('utf-8')
+            new_user['email'] = unicode(persons.get(user['username'].lower())[1]).encode('utf-8')
         else:
             new_user = user
             log.warning("User not in csv-file: " + str(user))
