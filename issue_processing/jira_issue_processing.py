@@ -323,6 +323,33 @@ def print_to_disk_extr(issues, results_folder):
     lines = []
     for issue in issues:
         log.info("Current issue '{}'".format(issue['externalId']))
+
+        lines.append((
+            issue['externalId'],
+            issue['state'],
+            issue['creationDate'],
+            issue['resolveDate'],
+            False,  ## Value of is.pull.request
+            issue['author']['name'],
+            issue['author']['email'],
+            issue['creationDate'],
+            "",  ## ref.name
+            "open"  ## event.name
+        ))
+
+        lines.append((
+            issue['externalId'],
+            issue['state'],
+            issue['creationDate'],
+            issue['resolveDate'],
+            False,  ## Value of is.pull.request
+            issue['author']['name'],
+            issue['author']['email'],
+            issue['creationDate'],
+            "",  ## ref.name
+            "commented"  ## event.name
+        ))
+
         for comment in issue["comments"]:
             lines.append((
                 issue['externalId'],
