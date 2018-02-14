@@ -14,6 +14,8 @@ from codeface.dbmanager import DBManager
 
 from csv_writer import csv_writer
 
+reload(sys)
+sys.setdefaultencoding('utf-8')
 
 def run():
     # get all needed paths and argument for the method call.
