@@ -275,10 +275,10 @@ def insert_user_data(issues, conf):
 
 
 def print_to_disk(issues, results_folder):
-    """Print issues to file 'issues.list' in result folder
+    """Print issues to file 'issues-jira.list' in result folder
 
     :param issues: the issues to dump
-    :param results_folder: the folder where to place 'issues.list' output file
+    :param results_folder: the folder where to place 'issues-jira.list' output file
     """
 
     # construct path to output file
