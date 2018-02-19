@@ -41,7 +41,7 @@ def run():
     # 4) dump result to disk
     print_to_disk(issues, __resdir)
 
-    log.info("Issue processing complete!")
+    log.info("Github issue processing complete!")
 
 
 def load(source_folder):
@@ -52,11 +52,11 @@ def load(source_folder):
     """
 
     srcfile = os.path.join(source_folder, "issues.json")
-    log.devinfo("Loading issues from file '{}'...".format(srcfile))
+    log.devinfo("Loading Github issues from file '{}'...".format(srcfile))
 
     # check if file exists and exit early if not
     if not os.path.exists(srcfile):
-        log.info("Issue file '{}' does not exist! Exiting early...".format(srcfile))
+        log.error("Github issue file '{}' does not exist! Exiting early...".format(srcfile))
         sys.exit(-1)
 
     with open(srcfile) as issues_file:
@@ -72,7 +72,7 @@ def reformat(issue_data):
     :return: the re-arranged issue data
     """
 
-    log.devinfo("Re-arranging issues...")
+    log.devinfo("Re-arranging Github issues...")
 
     # re-process all issues
     for issue in issue_data:
