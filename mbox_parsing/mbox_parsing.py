@@ -66,7 +66,7 @@ def __get_artifacts(results_folder):
     with open(os.path.join(results_folder, "commits.list"), 'r') as commit_list:
         for commit in commit_list:
             commit_seperated = str.split(commit, ';')
-            commit_set.add((commit_seperated[9], commit_seperated[10]))
+            commit_set.add((commit_seperated[12], commit_seperated[13]))
 
     return commit_set
 
