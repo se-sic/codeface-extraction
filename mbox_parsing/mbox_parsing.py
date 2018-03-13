@@ -1,4 +1,5 @@
 import argparse
+import csv
 import mailbox
 import multiprocessing
 import os.path
@@ -62,11 +63,19 @@ def __get_artifacts(results_folder):
     :return: a set of tuples (file name, artifact)
     """
 
+    commit_data_columns = [
+        "commit.id",  # id
+        "date", "author.name", "author.email",  # author information
+        "committer.date", "committer.name", "committer.email",  # committer information
+        "hash", "changed.files", "added.lines", "deleted.lines", "diff.size",  # commit information
+        "file", "artifact", "artifact.type", "artifact.diff.size"  ## commit-dependency information
+    ]
+
     commit_set = set()
-    with open(os.path.join(results_folder, "commits.list"), 'r') as commit_list:
-        for commit in commit_list:
-            commit_seperated = str.split(commit, ';')
-            commit_set.add((commit_seperated[12], commit_seperated[13]))
+    with open(os.path.join(results_folder, "commits.list"), 'r') as commit_file:
+        commit_list = csv.DictReader(commit_file, delimiter=';', fieldnames=commit_data_columns)
+        for row in commit_list:
+            commit_set.add((row["file"], row["artifact"]))
 
     return commit_set
 
@@ -111,7 +120,7 @@ def __parse_execute(artifact, schema, index, include_filepath):
     :return: a match list of tuples (file name, artifact, message ID)
     """
 
-    log.devinfo("Searching for artifact ({}, {})...".format(artifact[0][1:-1], artifact[1][1:-1]))
+    log.devinfo("Searching for artifact ({}, {})...".format(artifact[0], artifact[1]))
 
     result = []
 
@@ -130,7 +139,7 @@ def __parse_execute(artifact, schema, index, include_filepath):
 
         # construct result from query answer
         for r in query_result:
-            result_tuple = (artifact[0][1:-1], artifact[1][1:-1], r["messageID"])
+            result_tuple = (artifact[0], artifact[1], r["messageID"])
             result.append(result_tuple)
 
     return result
