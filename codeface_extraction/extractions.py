@@ -233,7 +233,7 @@ class CommitExtraction(Extraction):
                     JOIN commit c ON p.id = c.projectId
 
                     # get commit meta-data
-                    JOIN commit_dependency cd ON c.id = cd.commitId
+                    LEFT JOIN commit_dependency cd ON c.id = cd.commitId
 
                     # add authors/developers/persons
                     JOIN person a ON c.author = a.id
