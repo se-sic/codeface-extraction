@@ -56,10 +56,11 @@ def __get_index(mbox, results_folder, schema, reindex):
 
 
 # get the search terms from the commits.list file
-def __get_artifacts(results_folder):
+def __get_artifacts(results_folder, files_as_artifacts):
     """Get the list of artifacts from the list of commits ('commits.list' file)
 
     :param results_folder: the results folder with the file 'commits.list'
+    :param files_as_artifacts: indicator whether to use files (base names) as artifacts
     :return: a set of tuples (file name, artifact)
     """
 
@@ -75,7 +76,10 @@ def __get_artifacts(results_folder):
     with open(os.path.join(results_folder, "commits.list"), 'r') as commit_file:
         commit_list = csv.DictReader(commit_file, delimiter=';', fieldnames=commit_data_columns)
         for row in commit_list:
-            commit_set.add((row["file"], row["artifact"]))
+            if files_as_artifacts:
+                commit_set.add((row["file"], os.path.basename(row["file"])))
+            else:
+                commit_set.add((row["file"], row["artifact"]))
 
     return commit_set
 
@@ -145,12 +149,13 @@ def __parse_execute(artifact, schema, index, include_filepath):
     return result
 
 
-def parse(mbox_name, results_folder, include_filepath, reindex):
+def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reindex):
     """Parse the given mbox file with the commit information from the results folder.
 
     :param mbox_name: the mbox file to search in
     :param results_folder: the results folder for index and commit information
     :param include_filepath: indicator whether to use the 'file name' part of the artifact into account
+    :param files_as_artifacts: indicator whether to search for files (base names) as artifacts
     :param reindex: force reindexing if True
     """
 
@@ -164,7 +169,7 @@ def parse(mbox_name, results_folder, include_filepath, reindex):
     ix = __get_index(mbox, results_folder, schema, reindex)
 
     # extract artifacts from results folder
-    artifacts = __get_artifacts(results_folder)
+    artifacts = __get_artifacts(results_folder, files_as_artifacts)
 
     # parallelize execution call for the text search
     log.info("Start parsing...")
@@ -180,10 +185,14 @@ def parse(mbox_name, results_folder, include_filepath, reindex):
             result.append(row)
 
     # determine ouput file
+    filename = "mboxparsing"
+    if files_as_artifacts:
+        filename += "_file"
     if include_filepath:
-        output_file = os.path.join(results_folder, "mboxparsing_filepath.list")
+        filename += "_filepath.list"
     else:
-        output_file = os.path.join(results_folder, "mboxparsing.list")
+        filename += ".list"
+    output_file = os.path.join(results_folder, filename)
 
     # Writes found hits to file.
     log.info("Writing results to file {}.".format(output_file))
@@ -200,6 +209,7 @@ def run():
     parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
     parser.add_argument('-p', '--project', help="Project configuration file", required=True)
     parser.add_argument('-f', '--filepath', help="Include the filepath in the search", action="store_true")
+    parser.add_argument('--file', help="Use files (reps. their base names) as artifacts", action="store_true")
     parser.add_argument('-r', '--reindex', help="Re-construct the index", action="store_true")
     parser.add_argument('resdir', help="Directory to store analysis results in")
     parser.add_argument('maildir', help='Directory in which the mailinglists are located')
@@ -217,7 +227,7 @@ def run():
     # search the mailing lists
     for ml in __conf["mailinglists"]:
         mbox_file = os.path.join(__maildir, ml["name"] + ".mbox")
-        parse(mbox_file, __resdir_project, args.filepath, args.reindex)
+        parse(mbox_file, __resdir_project, args.filepath, args.file, args.reindex)
 
 
 if __name__ == "__main__":
