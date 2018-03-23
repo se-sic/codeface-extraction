@@ -427,23 +427,43 @@ def print_to_disk_gephi(issues, results_folder):
     csv_writer.write_to_csv(output_file_nodes, node_lines)
 
 
-## TODO: read, parse and use csv-data to find e-mail-adresses
-## unneeded right now
 def load_csv(source_folder):
     """Load persons from disk.
 
     :param source_folder: the folder where to find .csv-file
     :return: the loaded person data
     """
-    srcfile = os.path.join(source_folder, "jira-comment-authors-with-email.csv")
-    log.devinfo("Loading person csv from file '{}'...".format(srcfile))
+
+    def find_first_existing(source_folder, filenames):
+        """
+        Check if any of the given file names exist in the given folder and return the first existing.
+
+        :param source_folder: the folder where to search for the given file names
+        :param filenames: the file names to search for
+        :return: the first existing file name, None otherwise
+        """
+
+        filenames = map(lambda fi: os.path.join(source_folder, fi), filenames)
+        existing = map(lambda fi: os.path.exists(fi), filenames)
+        first = next((i for (i, x) in enumerate(existing) if x), None)
+
+        if first:
+            return filenames[first]
+        else:
+            return None
+
+    person_files = (
+        "jira-comment-authors-with-email.csv",
+        "jira_issue_comments.csv"
+    )
+    srcfile = find_first_existing(source_folder, person_files)
 
     # check if file exists and exit early if not
-    if not os.path.exists(srcfile):
-        log.error("Person file '{}' does not exist! Exiting early...".format(srcfile))
+    if not srcfile:
+        log.error("Person files '{}' do not exist! Exiting early...".format(person_files))
         sys.exit(-1)
 
-        # with open(srcfile, 'r') as person_file:
+    log.devinfo("Loading person csv from file '{}'...".format(srcfile))
     with open(srcfile, 'r') as f:
         person_data = csv.DictReader(f, delimiter=',', skipinitialspace=True)
         persons = {}
