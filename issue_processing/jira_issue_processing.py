@@ -447,7 +447,7 @@ def load_csv(source_folder):
         existing = map(lambda fi: os.path.exists(fi), filenames)
         first = next((i for (i, x) in enumerate(existing) if x), None)
 
-        if first:
+        if first is not None:
             return filenames[first]
         else:
             return None
