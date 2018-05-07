@@ -39,6 +39,7 @@ from csv_writer import csv_writer
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
+
 def run():
     # get all needed paths and argument for the method call.
     parser = argparse.ArgumentParser(prog='codeface', description='Codeface extraction')
@@ -76,6 +77,8 @@ def run():
     print_to_disk_gephi(issues, __resdir)
     # 6) export for jira issue extraction to use them in dev-network-growth
     print_to_disk_extr(issues, __resdir)
+    # 7 dump bug issues to disk
+    print_to_disk_bugs(issues, __resdir)
 
     log.info("Jira issue processing complete!")
 
@@ -137,6 +140,8 @@ def parse_xml(issue_data, persons):
             # temporary container for references
             comments = list()
             issue = dict()
+            components = []
+            refs = []
 
             # parse values form xml
             # add issue values to the issue
@@ -167,6 +172,19 @@ def parse_xml(issue_data, persons):
 
             project = issue_x.getElementsByTagName('project')[0]
             issue['projectId'] = project.attributes['id'].value
+
+            resolution = issue_x.getElementsByTagName('resolution')[0]
+            issue['resolution'] = resolution.firstChild.data
+
+            for component in issue_x.getElementsByTagName('component'):
+                components.append(component.firstChild.data)
+            issue['components'] = components
+
+            for ref in issue_x.getElementsByTagName('issuelinktype'):
+                refId = ref.getElementsByTagName('issuekey')[0].firstChild.data
+                refType = ref.getElementsByTagName('name')[0].firstChild.data
+                refs.append((refId, refType))
+            issue['references'] = refs
 
             reporter = issue_x.getElementsByTagName('reporter')[0]
             user = dict()
@@ -326,6 +344,74 @@ def print_to_disk(issues, results_folder):
                 issue['externalId'],
                 "comment"
             ))
+    # write to output file
+    csv_writer.write_to_csv(output_file, lines)
+
+
+def print_to_disk_bugs(issues, results_folder):
+    """Sorts of bug issues and prints them to file 'bugs-jira.list' in result folder
+
+    :param issues: the issues to sort of bugs
+    :param results_folder: the folder where to place 'bugs-jira.list' output file
+    """
+
+    # construct path to output file
+    output_file = os.path.join(results_folder, "bugs-jira.list")
+    log.info("Dumping output in file '{}'...".format(output_file))
+
+    # construct lines of output
+    lines = []
+    for issue in issues:
+        log.info("Current issue '{}'".format(issue['externalId']))
+
+        # only writes issues with type bug and their comments in the output file
+        if issue['type'] == "Bug":
+            lines.append((
+                issue['externalId'],
+                issue['state'],
+                issue['creationDate'],
+                issue['resolveDate'],
+                False,  ## Value of is.pull.request
+                issue['author']['name'],
+                issue['author']['email'],
+                issue['creationDate'],
+                issue['references'],
+                "open",  ## event.name
+                issue['resolution'],
+                issue['components']
+            ))
+
+            lines.append((
+                issue['externalId'],
+                issue['state'],
+                issue['creationDate'],
+                issue['resolveDate'],
+                False,  ## Value of is.pull.request
+                issue['author']['name'],
+                issue['author']['email'],
+                issue['creationDate'],
+                "",  ## ref.name
+                "commented",  ## event.name
+                "",  ##resolution
+                "",  ##components
+            ))
+
+            for comment in issue["comments"]:
+                lines.append((
+                    issue['externalId'],
+                    issue['state'],
+                    issue['creationDate'],
+                    issue['resolveDate'],
+                    False,  ## Value of is.pull.request
+                    comment['author']['name'],
+                    comment['author']['email'],
+                    comment['changeDate'],
+                    "",  ## ref.name
+                    "commented",  ## event.name
+                    "",  ##resolution
+                    "",  ##components
+                ))
+
     # write to output file
     csv_writer.write_to_csv(output_file, lines)
 
