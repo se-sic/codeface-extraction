@@ -36,8 +36,12 @@ from codeface.dbmanager import DBManager
 
 from csv_writer import csv_writer
 
+from jira import JIRA
+
 reload(sys)
 sys.setdefaultencoding('utf-8')
+with_api = True  # flag to choose if information via api shall be loaded. Increases runtime
+project_url = 'https://issues.apache.org/jira'  # needed for api
 
 
 def run():
@@ -68,16 +72,19 @@ def run():
     persons = load_csv(__srcdir_csv)
     # 2) re-format the issues
     issues = parse_xml(issues, persons)
-    # 3) update user data with Codeface database
+    # 3) load issue information via api
+    if with_api:
+        load_issue_via_api(issues, persons)
+    # 4) update user data with Codeface database
     # mabye not nessecary
     issues = insert_user_data(issues, __conf)
-    # 4) dump result to disk
+    # 5) dump result to disk
     print_to_disk(issues, __resdir)
-    # 5) export for Gephi
+    # 6) export for Gephi
     print_to_disk_gephi(issues, __resdir)
-    # 6) export for jira issue extraction to use them in dev-network-growth
+    # 7) export for jira issue extraction to use them in dev-network-growth
     print_to_disk_extr(issues, __resdir)
-    # 7 dump bug issues to disk
+    # 8) dump bug issues to disk
     print_to_disk_bugs(issues, __resdir)
 
     log.info("Jira issue processing complete!")
@@ -108,6 +115,26 @@ def load_xml(source_folder):
     return issue_data
 
 
+def merge_user_with_user_from_csv(user, persons):
+    """merges list of given users with list of already known users
+
+    :param user: list of users to be merged
+    :param persons: list of persons from JIRA (incl. e-mail addresses)
+    :return: list of merged users
+    """
+
+    new_user = dict()
+    if user['username'].lower() in persons.keys():
+        new_user['username'] = unicode(user['username'].lower()).encode('utf-8')
+        new_user['name'] = unicode(persons.get(user['username'].lower())[0]).encode('utf-8')
+        new_user['email'] = unicode(persons.get(user['username'].lower())[1]).encode('utf-8')
+    else:
+        new_user = user
+        log.warning("User not in csv-file: " + str(user))
+    log.info("current User: " + str(user) + ",    new user: " + str(new_user))
+    return new_user
+
+
 def parse_xml(issue_data, persons):
     """Parse issues from the xml-data
 
@@ -118,19 +145,6 @@ def parse_xml(issue_data, persons):
 
     log.info("Parse jira issues...")
     issues = list()
-
-    def merge_user_with_user_from_csv(user, persons):
-        new_user = dict()
-        if user['username'].lower() in persons.keys():
-            new_user['username'] = unicode(user['username'].lower()).encode('utf-8')
-            new_user['name'] = unicode(persons.get(user['username'].lower())[0]).encode('utf-8')
-            new_user['email'] = unicode(persons.get(user['username'].lower())[1]).encode('utf-8')
-        else:
-            new_user = user
-            log.warning("User not in csv-file: " + str(user))
-        log.info("current User: " + str(user) + ",    new user: " + str(new_user))
-        return new_user
-
     log.debug("Number of files:" + str(len(issue_data)))
     for issue_file in issue_data:
         issuelist = issue_file.getElementsByTagName('item')
@@ -204,6 +218,8 @@ def parse_xml(issue_data, persons):
                 user["name"] = ""
                 user["email"] = ""
                 comment["author"] = merge_user_with_user_from_csv(user, persons)
+                comment['state'] = issue['state']
+                comment['resolution'] = issue['resolution']
 
                 created = comment_x.attributes['created'].value
                 d = datetime.strptime(created, '%a, %d %b %Y %H:%M:%S +0000')
@@ -241,6 +257,69 @@ def parse_xml(issue_data, persons):
             issues.append(issue)
     log.debug("number of issues after parse_xml: '{}'".format(len(issues)))
     return issues
+
+
+def load_issue_via_api(issues, persons):
+    """For each issue in the list the history is added via the api
+
+        :param issues: list of issues
+        :param persons: list of persons from JIRA (incl. e-mail addresses)
+    """""
+
+    log.info("Load issue information via api...")
+    jira_project = JIRA(project_url)
+
+    for issue in issues:
+
+        min_date = issue['creationDate']
+        api_issue = jira_project.issue(issue['externalId'], expand='changelog')
+        changelog = api_issue.changelog
+        histories = list()
+
+        for change in changelog.histories:
+
+            old_state, new_state, old_resolution, new_resolution = "None", "None", "None", "None"
+
+            for item in change.items:
+
+                if item.field == 'status':
+                    old_state = str(item.fromString)
+                    new_state = str(item.toString)
+
+                elif item.field == 'resolution':
+                    old_resolution = str(item.fromString)
+                    new_resolution = str(item.toString)
+
+            # only history entries that change the state or the resolution are interesting
+            if (old_state != new_state) | (old_resolution != new_resolution):
+
+                history = dict()
+                history['state'] = new_state
+                history['resolution'] = new_resolution
+                user = dict()
+                user["username"] = change.author.name
+                user["name"] = change.author.name
+                user["email"] = ""
+                history["author"] = merge_user_with_user_from_csv(user, persons)
+                date = change.created
+                d = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f+0000")
+                history['date'] = d.strftime('%Y-%m-%d %H:%M:%S')
+                histories.append(history)
+
+                # updates state and resolution for issue and comments in the past
+                if (min_date <= issue['creationDate']) & (issue['creationDate'] < history['date']):
+                    issue['state'] = old_state
+                    issue['resolution'] = old_resolution
+
+                for comment in issue['comments']:
+
+                    if (min_date <= comment['changeDate']) & (comment['changeDate'] < history['date']):
+                        comment['state'] = old_state
+                        comment['resolution'] = old_resolution
+
+                min_date = history['date']
+
+        issue['history'] = histories
 
 
 def insert_user_data(issues, conf):
@@ -392,14 +471,14 @@ def print_to_disk_bugs(issues, results_folder):
                 issue['creationDate'],
                 "",  ## ref.name
                 "commented",  ## event.name
-                "",  ##resolution
+                issue['resolution'],
                 "",  ##components
             ))
 
             for comment in issue["comments"]:
                 lines.append((
                     issue['externalId'],
-                    issue['state'],
+                    comment['state'],
                     issue['creationDate'],
                     issue['resolveDate'],
                     False,  ## Value of is.pull.request
@@ -408,9 +487,26 @@ def print_to_disk_bugs(issues, results_folder):
                     comment['changeDate'],
                     "",  ## ref.name
                     "commented",  ## event.name
-                    "",  ##resolution
+                    comment['resolution'],
                     "",  ##components
                 ))
+
+            if with_api:
+                for history in issue['history']:
+                    lines.append((
+                        issue['externalId'],
+                        history['state'],
+                        issue['creationDate'],
+                        issue['resolveDate'],
+                        False,  ## Value of is.pull.request
+                        history['author']['name'],
+                        history['author']['email'],
+                        history['date'],
+                        "",  ## ref.name
+                        "updated",  ## event.name
+                        history['resolution'],
+                        ""  ##components
+                    ))
 
     # write to output file
     csv_writer.write_to_csv(output_file, lines)
