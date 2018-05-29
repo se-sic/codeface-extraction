@@ -15,6 +15,7 @@
 # Copyright 2017 by Raphael Nömmer <noemmer@fim.uni-passau.de>
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
+# Copyright 2018 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file is able to extract Jira issue data from xml files.
@@ -40,8 +41,6 @@ from jira import JIRA
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
-with_api = True  # flag to choose if information via api shall be loaded. Increases runtime
-project_url = 'https://issues.apache.org/jira'  # needed for api
 
 
 def run():
@@ -50,6 +49,7 @@ def run():
     parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
     parser.add_argument('-p', '--project', help="Project configuration file", required=True)
     parser.add_argument('resdir', help="Directory to store analysis results in")
+    parser.add_argument('-s', '--skip_history', help='Skips methods that retrieve the history', action='store_true')
 
     # parse arguments
     args = parser.parse_args(sys.argv[1:])
@@ -73,8 +73,8 @@ def run():
     # 2) re-format the issues
     issues = parse_xml(issues, persons)
     # 3) load issue information via api
-    if with_api:
-        load_issue_via_api(issues, persons)
+    if not args.skip_history:
+        load_issue_via_api(issues, persons, __conf)
     # 4) update user data with Codeface database
     # mabye not nessecary
     issues = insert_user_data(issues, __conf)
@@ -85,7 +85,7 @@ def run():
     # 7) export for jira issue extraction to use them in dev-network-growth
     print_to_disk_extr(issues, __resdir)
     # 8) dump bug issues to disk
-    print_to_disk_bugs(issues, __resdir)
+    print_to_disk_bugs(issues, __resdir, args.skip_history)
 
     log.info("Jira issue processing complete!")
 
@@ -218,8 +218,8 @@ def parse_xml(issue_data, persons):
                 user["name"] = ""
                 user["email"] = ""
                 comment["author"] = merge_user_with_user_from_csv(user, persons)
-                comment['state'] = issue['state']
-                comment['resolution'] = issue['resolution']
+                comment['state_on_creation'] = issue['state']  # can get updated if history is retrieved
+                comment['resolution_on_creation'] = issue['resolution']  # can get updated if history is retrieved
 
                 created = comment_x.attributes['created'].value
                 d = datetime.strptime(created, '%a, %d %b %Y %H:%M:%S +0000')
@@ -259,43 +259,46 @@ def parse_xml(issue_data, persons):
     return issues
 
 
-def load_issue_via_api(issues, persons):
+def load_issue_via_api(issues, persons, conf):
     """For each issue in the list the history is added via the api
 
         :param issues: list of issues
         :param persons: list of persons from JIRA (incl. e-mail addresses)
-    """""
+        :param conf: the project configuration
+    """
 
     log.info("Load issue information via api...")
-    jira_project = JIRA(project_url)
+    jira_project = JIRA(conf['issueTrackerURL'])
 
     for issue in issues:
 
-        min_date = issue['creationDate']
+        last_checked = issue['creationDate']  # needed to update state and resolution on creation for comments
         api_issue = jira_project.issue(issue['externalId'], expand='changelog')
         changelog = api_issue.changelog
         histories = list()
 
+        # history changes get visited in time order from oldest to newest
         for change in changelog.histories:
 
-            old_state, new_state, old_resolution, new_resolution = "None", "None", "None", "None"
+            old_state, new_state, old_resolution, new_resolution = None, None, None, None
 
             for item in change.items:
 
                 if item.field == 'status':
-                    old_state = str(item.fromString)
-                    new_state = str(item.toString)
+                    old_state = item.fromString
+                    new_state = item.toString
 
                 elif item.field == 'resolution':
-                    old_resolution = str(item.fromString)
-                    new_resolution = str(item.toString)
+                    old_resolution = item.fromString
+                    new_resolution = item.toString
 
             # only history entries that change the state or the resolution are interesting
             if (old_state != new_state) | (old_resolution != new_resolution):
-
+                if (old_resolution is None) & (new_resolution is not None):  # adjust to xml information
+                    old_resolution = "Unresolved"
                 history = dict()
-                history['state'] = new_state
-                history['resolution'] = new_resolution
+                history['new_state'] = new_state
+                history['new_resolution'] = new_resolution
                 user = dict()
                 user["username"] = change.author.name
                 user["name"] = change.author.name
@@ -304,20 +307,19 @@ def load_issue_via_api(issues, persons):
                 date = change.created
                 d = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f+0000")
                 history['date'] = d.strftime('%Y-%m-%d %H:%M:%S')
-                histories.append(history)
 
-                # updates state and resolution for issue and comments in the past
-                if (min_date <= issue['creationDate']) & (issue['creationDate'] < history['date']):
-                    issue['state'] = old_state
-                    issue['resolution'] = old_resolution
-
+                # updates state and resolution on creation for comments
                 for comment in issue['comments']:
 
-                    if (min_date <= comment['changeDate']) & (comment['changeDate'] < history['date']):
-                        comment['state'] = old_state
-                        comment['resolution'] = old_resolution
+                    # if-block checks between which history entries the comment was created to update the state and
+                    # the resolution on creation
+                    if (last_checked <= comment['changeDate']) & (comment['changeDate'] < history['date']):
+                        comment['state_on_creation'] = old_state
+                        comment['resolution_on_creation'] = old_resolution
 
-                min_date = history['date']
+                last_checked = history['date']
+
+                histories.append(history)
 
         issue['history'] = histories
 
@@ -427,7 +429,7 @@ def print_to_disk(issues, results_folder):
     csv_writer.write_to_csv(output_file, lines)
 
 
-def print_to_disk_bugs(issues, results_folder):
+def print_to_disk_bugs(issues, results_folder, skip_history):
     """Sorts of bug issues and prints them to file 'bugs-jira.list' in result folder
 
     :param issues: the issues to sort of bugs
@@ -448,6 +450,7 @@ def print_to_disk_bugs(issues, results_folder):
             lines.append((
                 issue['externalId'],
                 issue['state'],
+                issue['resolution'],
                 issue['creationDate'],
                 issue['resolveDate'],
                 False,  ## Value of is.pull.request
@@ -456,13 +459,15 @@ def print_to_disk_bugs(issues, results_folder):
                 issue['creationDate'],
                 issue['references'],
                 "open",  ## event.name
-                issue['resolution'],
-                issue['components']
+                issue['components'],
+                "Open", ## default state when created
+                "Unresolved" ## default resolution when created
             ))
 
             lines.append((
                 issue['externalId'],
                 issue['state'],
+                issue['resolution'],
                 issue['creationDate'],
                 issue['resolveDate'],
                 False,  ## Value of is.pull.request
@@ -471,14 +476,16 @@ def print_to_disk_bugs(issues, results_folder):
                 issue['creationDate'],
                 "",  ## ref.name
                 "commented",  ## event.name
-                issue['resolution'],
                 "",  ##components
+                "Open",  ##  default state when created
+                "Unresolved"  ## default resolution when created
             ))
 
             for comment in issue["comments"]:
                 lines.append((
                     issue['externalId'],
-                    comment['state'],
+                    issue['state'],
+                    issue['resolution'],
                     issue['creationDate'],
                     issue['resolveDate'],
                     False,  ## Value of is.pull.request
@@ -487,15 +494,17 @@ def print_to_disk_bugs(issues, results_folder):
                     comment['changeDate'],
                     "",  ## ref.name
                     "commented",  ## event.name
-                    comment['resolution'],
                     "",  ##components
+                    comment['state_on_creation'],
+                    comment['resolution_on_creation']
                 ))
 
-            if with_api:
+            if not skip_history:
                 for history in issue['history']:
                     lines.append((
                         issue['externalId'],
-                        history['state'],
+                        issue['state'],
+                        issue['resolution'],
                         issue['creationDate'],
                         issue['resolveDate'],
                         False,  ## Value of is.pull.request
@@ -504,8 +513,9 @@ def print_to_disk_bugs(issues, results_folder):
                         history['date'],
                         "",  ## ref.name
                         "updated",  ## event.name
-                        history['resolution'],
-                        ""  ##components
+                        "",  ##components
+                        history['new_state'],
+                        history['new_resolution']
                     ))
 
     # write to output file
