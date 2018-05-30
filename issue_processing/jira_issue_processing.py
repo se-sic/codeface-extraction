@@ -49,7 +49,10 @@ def run():
     parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
     parser.add_argument('-p', '--project', help="Project configuration file", required=True)
     parser.add_argument('resdir', help="Directory to store analysis results in")
-    parser.add_argument('-s', '--skip_history', help='Skips methods that retrieve the history', action='store_true')
+    parser.add_argument('-s', '--skip_history',
+                        help="Skip methods that retrieve additional history information from the configured JIRA" +
+                             "server. This decreases the runtime and shuts off the external connection",
+                        action='store_true')
 
     # parse arguments
     args = parser.parse_args(sys.argv[1:])
@@ -74,7 +77,7 @@ def run():
     issues = parse_xml(issues, persons)
     # 3) load issue information via api
     if not args.skip_history:
-        load_issue_via_api(issues, persons, __conf)
+        load_issue_via_api(issues, persons, __conf['issueTrackerURL'])
     # 4) update user data with Codeface database
     # mabye not nessecary
     issues = insert_user_data(issues, __conf)
@@ -259,16 +262,16 @@ def parse_xml(issue_data, persons):
     return issues
 
 
-def load_issue_via_api(issues, persons, conf):
+def load_issue_via_api(issues, persons, url):
     """For each issue in the list the history is added via the api
 
         :param issues: list of issues
         :param persons: list of persons from JIRA (incl. e-mail addresses)
-        :param conf: the project configuration
+        :param url: the project url
     """
 
     log.info("Load issue information via api...")
-    jira_project = JIRA(conf['issueTrackerURL'])
+    jira_project = JIRA(url)
 
     for issue in issues:
 
@@ -434,6 +437,7 @@ def print_to_disk_bugs(issues, results_folder, skip_history):
 
     :param issues: the issues to sort of bugs
     :param results_folder: the folder where to place 'bugs-jira.list' output file
+    :param skip_history: flag if history informations got retrieved and can be printed to the output file
     """
 
     # construct path to output file
