@@ -15,6 +15,7 @@
 # Copyright 2017 by Raphael Nömmer <noemmer@fim.uni-passau.de>
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
+# Copyright 2018 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file is able to extract Jira issue data from xml files.
@@ -36,8 +37,11 @@ from codeface.dbmanager import DBManager
 
 from csv_writer import csv_writer
 
+from jira import JIRA
+
 reload(sys)
 sys.setdefaultencoding('utf-8')
+
 
 def run():
     # get all needed paths and argument for the method call.
@@ -45,6 +49,10 @@ def run():
     parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
     parser.add_argument('-p', '--project', help="Project configuration file", required=True)
     parser.add_argument('resdir', help="Directory to store analysis results in")
+    parser.add_argument('-s', '--skip_history',
+                        help="Skip methods that retrieve additional history information from the configured JIRA" +
+                             "server. This decreases the runtime and shuts off the external connection",
+                        action='store_true')
 
     # parse arguments
     args = parser.parse_args(sys.argv[1:])
@@ -67,15 +75,20 @@ def run():
     persons = load_csv(__srcdir_csv)
     # 2) re-format the issues
     issues = parse_xml(issues, persons)
-    # 3) update user data with Codeface database
+    # 3) load issue information via api
+    if not args.skip_history:
+        load_issue_via_api(issues, persons, __conf['issueTrackerURL'])
+    # 4) update user data with Codeface database
     # mabye not nessecary
     issues = insert_user_data(issues, __conf)
-    # 4) dump result to disk
+    # 5) dump result to disk
     print_to_disk(issues, __resdir)
-    # 5) export for Gephi
+    # 6) export for Gephi
     print_to_disk_gephi(issues, __resdir)
-    # 6) export for jira issue extraction to use them in dev-network-growth
+    # 7) export for jira issue extraction to use them in dev-network-growth
     print_to_disk_extr(issues, __resdir)
+    # 8) dump bug issues to disk
+    print_to_disk_bugs(issues, __resdir, args.skip_history)
 
     log.info("Jira issue processing complete!")
 
@@ -105,6 +118,26 @@ def load_xml(source_folder):
     return issue_data
 
 
+def merge_user_with_user_from_csv(user, persons):
+    """merges list of given users with list of already known users
+
+    :param user: list of users to be merged
+    :param persons: list of persons from JIRA (incl. e-mail addresses)
+    :return: list of merged users
+    """
+
+    new_user = dict()
+    if user['username'].lower() in persons.keys():
+        new_user['username'] = unicode(user['username'].lower()).encode('utf-8')
+        new_user['name'] = unicode(persons.get(user['username'].lower())[0]).encode('utf-8')
+        new_user['email'] = unicode(persons.get(user['username'].lower())[1]).encode('utf-8')
+    else:
+        new_user = user
+        log.warning("User not in csv-file: " + str(user))
+    log.info("current User: " + str(user) + ",    new user: " + str(new_user))
+    return new_user
+
+
 def parse_xml(issue_data, persons):
     """Parse issues from the xml-data
 
@@ -115,19 +148,6 @@ def parse_xml(issue_data, persons):
 
     log.info("Parse jira issues...")
     issues = list()
-
-    def merge_user_with_user_from_csv(user, persons):
-        new_user = dict()
-        if user['username'].lower() in persons.keys():
-            new_user['username'] = unicode(user['username'].lower()).encode('utf-8')
-            new_user['name'] = unicode(persons.get(user['username'].lower())[0]).encode('utf-8')
-            new_user['email'] = unicode(persons.get(user['username'].lower())[1]).encode('utf-8')
-        else:
-            new_user = user
-            log.warning("User not in csv-file: " + str(user))
-        log.info("current User: " + str(user) + ",    new user: " + str(new_user))
-        return new_user
-
     log.debug("Number of files:" + str(len(issue_data)))
     for issue_file in issue_data:
         issuelist = issue_file.getElementsByTagName('item')
@@ -137,6 +157,8 @@ def parse_xml(issue_data, persons):
             # temporary container for references
             comments = list()
             issue = dict()
+            components = []
+            refs = []
 
             # parse values form xml
             # add issue values to the issue
@@ -168,6 +190,19 @@ def parse_xml(issue_data, persons):
             project = issue_x.getElementsByTagName('project')[0]
             issue['projectId'] = project.attributes['id'].value
 
+            resolution = issue_x.getElementsByTagName('resolution')[0]
+            issue['resolution'] = resolution.firstChild.data
+
+            for component in issue_x.getElementsByTagName('component'):
+                components.append(component.firstChild.data)
+            issue['components'] = components
+
+            for ref in issue_x.getElementsByTagName('issuelinktype'):
+                refId = ref.getElementsByTagName('issuekey')[0].firstChild.data
+                refType = ref.getElementsByTagName('name')[0].firstChild.data
+                refs.append((refId, refType))
+            issue['references'] = refs
+
             reporter = issue_x.getElementsByTagName('reporter')[0]
             user = dict()
             user["username"] = reporter.attributes['username'].value
@@ -186,6 +221,8 @@ def parse_xml(issue_data, persons):
                 user["name"] = ""
                 user["email"] = ""
                 comment["author"] = merge_user_with_user_from_csv(user, persons)
+                comment['state_on_creation'] = issue['state']  # can get updated if history is retrieved
+                comment['resolution_on_creation'] = issue['resolution']  # can get updated if history is retrieved
 
                 created = comment_x.attributes['created'].value
                 d = datetime.strptime(created, '%a, %d %b %Y %H:%M:%S +0000')
@@ -223,6 +260,71 @@ def parse_xml(issue_data, persons):
             issues.append(issue)
     log.debug("number of issues after parse_xml: '{}'".format(len(issues)))
     return issues
+
+
+def load_issue_via_api(issues, persons, url):
+    """For each issue in the list the history is added via the api
+
+        :param issues: list of issues
+        :param persons: list of persons from JIRA (incl. e-mail addresses)
+        :param url: the project url
+    """
+
+    log.info("Load issue information via api...")
+    jira_project = JIRA(url)
+
+    for issue in issues:
+
+        last_checked = issue['creationDate']  # needed to update state and resolution on creation for comments
+        api_issue = jira_project.issue(issue['externalId'], expand='changelog')
+        changelog = api_issue.changelog
+        histories = list()
+
+        # history changes get visited in time order from oldest to newest
+        for change in changelog.histories:
+
+            old_state, new_state, old_resolution, new_resolution = None, None, None, None
+
+            for item in change.items:
+
+                if item.field == 'status':
+                    old_state = item.fromString
+                    new_state = item.toString
+
+                elif item.field == 'resolution':
+                    old_resolution = item.fromString
+                    new_resolution = item.toString
+
+            # only history entries that change the state or the resolution are interesting
+            if (old_state != new_state) | (old_resolution != new_resolution):
+                if (old_resolution is None) & (new_resolution is not None):  # adjust to xml information
+                    old_resolution = "Unresolved"
+                history = dict()
+                history['new_state'] = new_state
+                history['new_resolution'] = new_resolution
+                user = dict()
+                user["username"] = change.author.name
+                user["name"] = change.author.name
+                user["email"] = ""
+                history["author"] = merge_user_with_user_from_csv(user, persons)
+                date = change.created
+                d = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f+0000")
+                history['date'] = d.strftime('%Y-%m-%d %H:%M:%S')
+
+                # updates state and resolution on creation for comments
+                for comment in issue['comments']:
+
+                    # if-block checks between which history entries the comment was created to update the state and
+                    # the resolution on creation
+                    if (last_checked <= comment['changeDate']) & (comment['changeDate'] < history['date']):
+                        comment['state_on_creation'] = old_state
+                        comment['resolution_on_creation'] = old_resolution
+
+                last_checked = history['date']
+
+                histories.append(history)
+
+        issue['history'] = histories
 
 
 def insert_user_data(issues, conf):
@@ -326,6 +428,100 @@ def print_to_disk(issues, results_folder):
                 issue['externalId'],
                 "comment"
             ))
+    # write to output file
+    csv_writer.write_to_csv(output_file, lines)
+
+
+def print_to_disk_bugs(issues, results_folder, skip_history):
+    """Sorts of bug issues and prints them to file 'bugs-jira.list' in result folder
+
+    :param issues: the issues to sort of bugs
+    :param results_folder: the folder where to place 'bugs-jira.list' output file
+    :param skip_history: flag if history informations got retrieved and can be printed to the output file
+    """
+
+    # construct path to output file
+    output_file = os.path.join(results_folder, "bugs-jira.list")
+    log.info("Dumping output in file '{}'...".format(output_file))
+
+    # construct lines of output
+    lines = []
+    for issue in issues:
+        log.info("Current issue '{}'".format(issue['externalId']))
+
+        # only writes issues with type bug and their comments in the output file
+        if issue['type'] == "Bug":
+            lines.append((
+                issue['externalId'],
+                issue['state'],
+                issue['resolution'],
+                issue['creationDate'],
+                issue['resolveDate'],
+                False,  ## Value of is.pull.request
+                issue['author']['name'],
+                issue['author']['email'],
+                issue['creationDate'],
+                issue['references'],
+                "open",  ## event.name
+                issue['components'],
+                "Open", ## default state when created
+                "Unresolved" ## default resolution when created
+            ))
+
+            lines.append((
+                issue['externalId'],
+                issue['state'],
+                issue['resolution'],
+                issue['creationDate'],
+                issue['resolveDate'],
+                False,  ## Value of is.pull.request
+                issue['author']['name'],
+                issue['author']['email'],
+                issue['creationDate'],
+                "",  ## ref.name
+                "commented",  ## event.name
+                "",  ##components
+                "Open",  ##  default state when created
+                "Unresolved"  ## default resolution when created
+            ))
+
+            for comment in issue["comments"]:
+                lines.append((
+                    issue['externalId'],
+                    issue['state'],
+                    issue['resolution'],
+                    issue['creationDate'],
+                    issue['resolveDate'],
+                    False,  ## Value of is.pull.request
+                    comment['author']['name'],
+                    comment['author']['email'],
+                    comment['changeDate'],
+                    "",  ## ref.name
+                    "commented",  ## event.name
+                    "",  ##components
+                    comment['state_on_creation'],
+                    comment['resolution_on_creation']
+                ))
+
+            if not skip_history:
+                for history in issue['history']:
+                    lines.append((
+                        issue['externalId'],
+                        issue['state'],
+                        issue['resolution'],
+                        issue['creationDate'],
+                        issue['resolveDate'],
+                        False,  ## Value of is.pull.request
+                        history['author']['name'],
+                        history['author']['email'],
+                        history['date'],
+                        "",  ## ref.name
+                        "updated",  ## event.name
+                        "",  ##components
+                        history['new_state'],
+                        history['new_resolution']
+                    ))
+
     # write to output file
     csv_writer.write_to_csv(output_file, lines)
 
