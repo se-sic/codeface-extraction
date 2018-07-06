@@ -266,6 +266,47 @@ class CommitExtraction(Extraction):
                     # LIMIT 10
                 """
 
+# Extraction of function implementations
+class FunctionImplementationExtraction(Extraction):
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
+
+        self.file_name = "implementations.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT c.id,
+                           c.commitHash, c.ChangedFiles,
+                           cd.file, cd.entityId, cd.impl
+
+                    FROM project p
+
+                    # get commits for project
+                    JOIN commit c ON p.id = c.projectId
+
+                    # get commit meta-data
+                    LEFT JOIN commit_dependency cd ON c.id = cd.commitId
+
+                    # filter for current project
+                    WHERE p.name = '{project}'
+                    AND p.analysisMethod = '{tagging}'
+                    AND cd.file IS NOT NULL
+
+                    ORDER BY cd.file, c.id, c.commitHash, cd.entityId
+                """
+
+    def _reduce_result(self, result):
+        newResult = []
+        for (commitId, commitHash, changedFiles, fileId, entityId, impl) in result:
+            newImpl = impl.replace("\n", " ")
+            newImpl = newImpl.replace("\r", " ")
+            newImpl = newImpl.replace("\t", " ")
+            newImpl = newImpl.replace(u"\ufffd", " ")
+
+            newResult.append((commitId, commitHash, changedFiles, fileId, entityId, newImpl))
+
+        return newResult
+
 
 class EmailExtraction(Extraction):
     def __init__(self, dbm, conf, resdir, csv_writer):
