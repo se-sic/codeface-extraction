@@ -14,6 +14,7 @@
 #
 # Copyright 2015-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2016 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file provides the class 'Extraction' and all of its subclasses.
@@ -21,6 +22,8 @@ This file provides the class 'Extraction' and all of its subclasses.
 
 import itertools
 import os
+import unicodedata
+import re
 
 from codeface.cli import log
 
@@ -275,8 +278,7 @@ class FunctionImplementationExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT c.id,
-                           c.commitHash, c.ChangedFiles,
+                    SELECT c.id, c.commitHash,
                            cd.file, cd.entityId, cd.impl
 
                     FROM project p
@@ -292,18 +294,22 @@ class FunctionImplementationExtraction(Extraction):
                     AND p.analysisMethod = '{tagging}'
                     AND cd.file IS NOT NULL
 
-                    ORDER BY cd.file, c.id, c.commitHash, cd.entityId
+                    ORDER BY cd.file, cd.entityId, c.id, c.commitHash
                 """
 
     def _reduce_result(self, result):
-        newResult = []
-        for (commitId, commitHash, changedFiles, fileId, entityId, impl) in result:
-            newImpl = impl.replace("\n", " ")
-            newImpl = newImpl.replace("\r", " ")
-            newImpl = newImpl.replace("\t", " ")
-            newImpl = newImpl.replace(u"\ufffd", " ")
+        """
+        Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
+        string where all control characters have been replaced by a space
+        """
 
-            newResult.append((commitId, commitHash, changedFiles, fileId, entityId, newImpl))
+        newResult = []
+        for (commitId, commitHash, fileId, entityId, impl) in result:
+            newImpl = impl.encode('utf-8')
+            newImpl = re.sub(r'\\ufff.', ' ', newImpl)
+            newImpl = "".join(ch if unicodedata.category(ch)[0]!="C" else " " for ch in newImpl.decode('unicode-escape'))
+
+            newResult.append((commitId, commitHash, fileId, entityId, newImpl))
 
         return newResult
 
