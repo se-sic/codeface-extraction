@@ -33,12 +33,14 @@ from codeface.cli import log
 #
 
 
-def get_extractions(dbm, conf, resdir, csv_writer):
+def get_extractions(dbm, conf, resdir, csv_writer, exclude_impl):
     # all extractions are sublcasses of Extraction:
     # instantiate them all!
     __extractions = []
     for cls in Extraction.__subclasses__():
-        __extractions.append(cls(dbm, conf, resdir, csv_writer))
+        if (exclude_impl or
+        	str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationExtraction'>"):
+            __extractions.append(cls(dbm, conf, resdir, csv_writer))
 
     # group extractions by "project-levelness"
     __extractions_grouped = dict(
@@ -46,6 +48,7 @@ def get_extractions(dbm, conf, resdir, csv_writer):
         for key, extractions in
         itertools.groupby(__extractions, lambda y: y.is_project_level())
     )
+
     __extractions_project = __extractions_grouped[True]
     __extractions_range = __extractions_grouped[False]
 
