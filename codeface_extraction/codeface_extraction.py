@@ -14,6 +14,7 @@
 #
 # Copyright 2015-2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2016 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file is able to extract developer--artifact relations from the Codeface database.
@@ -35,7 +36,7 @@ from csv_writer import csv_writer
 # RUN FOR ALL PROJECTS
 ##
 
-def run_extraction(conf, resdir, exclude_impl):
+def run_extraction(conf, resdir, extract_impl, extract_on_range_level):
     """
     Runs the extraction process for the list of given parameters.
 
@@ -49,7 +50,7 @@ def run_extraction(conf, resdir, exclude_impl):
     dbm = DBManager(conf)
 
     # get all types of extractions, both project-level and range-level
-    __extractions_project, __extractions_range = extractions.get_extractions(dbm, conf, resdir, csv_writer, exclude_impl)
+    __extractions_project, __extractions_range = extractions.get_extractions(dbm, conf, resdir, csv_writer, extract_impl, extract_on_range_level)
 
     # run project-level extractions
     for extraction in __extractions_project:
@@ -93,7 +94,9 @@ def get_parser():
     run_parser.add_argument('-p', '--project', help="Project configuration file",
                             required=True)
     run_parser.add_argument('-i', '--implementation', help="Enable extraction of the source code of functions",
-                            type=lambda x: (str(x).lower() == 'true'), default=False)
+                            action='store_true')
+    run_parser.add_argument('-r', '--range', help="Enable extraction of the data on range level",
+                            action='store_true')
     run_parser.add_argument('resdir',
                             help="Directory to store analysis results in")
 
@@ -109,12 +112,13 @@ def run():
     # - First make all the args absolute
     __resdir = abspath(args.resdir)
     __codeface_conf, __project_conf = map(abspath, (args.config, args.project))
-    __exclude_impl = args.implementation
+    __extract_impl = args.implementation
+    __extract_on_range_level = args.range
 
     # load configuration
     __conf = Configuration.load(__codeface_conf, __project_conf)
 
-    run_extraction(__conf, __resdir, __exclude_impl)
+    run_extraction(__conf, __resdir, __extract_impl, __extract_on_range_level)
 
 
 if __name__ == '__main__':

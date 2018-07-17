@@ -33,13 +33,14 @@ from codeface.cli import log
 #
 
 
-def get_extractions(dbm, conf, resdir, csv_writer, exclude_impl):
+def get_extractions(dbm, conf, resdir, csv_writer, extract_impl, extract_on_range_level):
     # all extractions are sublcasses of Extraction:
     # instantiate them all!
     __extractions = []
     for cls in Extraction.__subclasses__():
-        if (exclude_impl or
-        	str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationExtraction'>"):
+        if (extract_impl or
+                (str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationExtraction'>" and
+                 str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationRangeExtraction'>")):
             __extractions.append(cls(dbm, conf, resdir, csv_writer))
 
     # group extractions by "project-levelness"
@@ -50,7 +51,10 @@ def get_extractions(dbm, conf, resdir, csv_writer, exclude_impl):
     )
 
     __extractions_project = __extractions_grouped[True]
-    __extractions_range = __extractions_grouped[False]
+    if (extract_on_range_level):
+        __extractions_range = __extractions_grouped[False]
+    else:
+        __extractions_range = []
 
     return __extractions_project, __extractions_range
 
@@ -303,14 +307,16 @@ class FunctionImplementationExtraction(Extraction):
     def _reduce_result(self, result):
         """
         Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
-        string where all control characters have been replaced by a space
+        string where all control characters have been replaced by a space.
+        More information: https://www.fileformat.info/info/unicode/category/index.htm
+        and https://www.compart.com/en/unicode/block/U+FFF0
         """
 
         newResult = []
         for (commitId, commitHash, fileId, entityId, impl) in result:
-            newImpl = impl.encode('utf-8')
-            newImpl = re.sub(r'\\ufff.', ' ', newImpl)
-            newImpl = "".join(ch if unicodedata.category(ch)[0]!="C" else " " for ch in newImpl.decode('unicode-escape'))
+            newImpl = impl.encode("utf-8")
+            newImpl = re.sub(r"\\ufff.", " ", newImpl)
+            newImpl = "".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in newImpl.decode("unicode-escape"))
 
             newResult.append((commitId, commitHash, fileId, entityId, newImpl))
 
@@ -492,3 +498,57 @@ class EmailRangeExtraction(Extraction):
 
                     # LIMIT 10
                 """
+
+class FunctionImplementationRangeExtraction(Extraction):
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
+
+        self.file_name = "implementations.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT c.id, c.commitHash,
+                           cd.file, cd.entityId, cd.impl
+
+                    FROM project p
+
+		    # get release range for projects
+                    JOIN release_range r ON p.id = r.projectId
+
+                    # start of range
+                    JOIN release_timeline l1 ON r.releaseStartId = l1.id
+                    # end of range
+                    JOIN release_timeline l2 ON r.releaseEndId = l2.id
+
+                    # add commits for the ranges
+                    JOIN commit c ON r.id = c.releaseRangeId
+
+                    # get commit meta-data
+                    LEFT JOIN commit_dependency cd ON c.id = cd.commitId
+
+                    # filter for current project and range
+                    WHERE p.name = '{project}'
+                    AND p.analysisMethod = '{tagging}'
+                    AND l2.tag = '{revision}'
+                    AND cd.file IS NOT NULL
+
+                    ORDER BY cd.file, cd.entityId, c.id, c.commitHash
+                """
+
+    def _reduce_result(self, result):
+        """
+        Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
+        string where all control characters have been replaced by a space.
+        More information: https://www.fileformat.info/info/unicode/category/index.htm
+        and https://www.compart.com/en/unicode/block/U+FFF0
+        """
+
+        newResult = []
+        for (commitId, commitHash, fileId, entityId, impl) in result:
+            newImpl = impl.encode("utf-8")
+            newImpl = re.sub(r"\\ufff.", " ", newImpl)
+            newImpl = "".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in newImpl.decode("unicode-escape"))
+
+            newResult.append((commitId, commitHash, fileId, entityId, newImpl))
+
+        return newResult
