@@ -305,22 +305,9 @@ class FunctionImplementationExtraction(Extraction):
                 """
 
     def _reduce_result(self, result):
-        """
-        Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
-        string where all control characters have been replaced by a space.
-        More information: https://www.fileformat.info/info/unicode/category/index.htm
-        and https://www.compart.com/en/unicode/block/U+FFF0
-        """
-
-        newResult = []
-        for (commitId, commitHash, fileId, entityId, impl) in result:
-            newImpl = impl.encode("utf-8")
-            newImpl = re.sub(r"\\ufff.", " ", newImpl)
-            newImpl = "".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in newImpl.decode("unicode-escape"))
-
-            newResult.append((commitId, commitHash, fileId, entityId, newImpl))
-
-        return newResult
+        # remove problematic characters from implementation column
+        return [(commitId, commitHash, fileId, entityId, remove_problematic_characters(impl))
+                for (commitId, commitHash, fileId, entityId, impl) in result]
 
 
 class EmailExtraction(Extraction):
@@ -536,19 +523,31 @@ class FunctionImplementationRangeExtraction(Extraction):
                 """
 
     def _reduce_result(self, result):
-        """
-        Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
-        string where all control characters have been replaced by a space.
-        More information: https://www.fileformat.info/info/unicode/category/index.htm
-        and https://www.compart.com/en/unicode/block/U+FFF0
-        """
+        # remove problematic characters from implementation column
+        return [(commitId, commitHash, fileId, entityId, remove_problematic_characters(impl))
+                for (commitId, commitHash, fileId, entityId, impl) in result]
 
-        newResult = []
-        for (commitId, commitHash, fileId, entityId, impl) in result:
-            newImpl = impl.encode("utf-8")
-            newImpl = re.sub(r"\\ufff.", " ", newImpl)
-            newImpl = "".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in newImpl.decode("unicode-escape"))
 
-            newResult.append((commitId, commitHash, fileId, entityId, newImpl))
+#
+# HELPER FUNCTIONS
+#
 
-        return newResult
+def remove_problematic_characters(text):
+    """
+    Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
+    string where all control characters have been replaced by a space.
+
+    More information:
+    and
+    """
+
+    # encode as UTF-8
+    new_text = text.encode("utf-8")
+    # remove unicode characters from "Specials" block
+    # see: https://www.compart.com/en/unicode/block/U+FFF0
+    new_text = re.sub(r"\\ufff.", " ", new_text)
+    # remove all kinds of control characters
+    # see: https://www.fileformat.info/info/unicode/category/index.htm
+    new_text = "".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in new_text.decode("unicode-escape"))
+
+    return new_text
