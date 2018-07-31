@@ -278,6 +278,7 @@ class CommitExtraction(Extraction):
                     # LIMIT 10
                 """
 
+
 # Extraction of function implementations
 class FunctionImplementationExtraction(Extraction):
     def __init__(self, dbm, conf, resdir, csv_writer):
@@ -368,7 +369,7 @@ class RevisionExtraction(Extraction):
     def get_list(self):
         result = self._run_sql(None, None)
         lines = self._reduce_result(result)
-        return [rev for (rev,date) in lines]
+        return [rev for (rev, date) in lines]
 
 
 #
@@ -403,6 +404,7 @@ class AuthorRangeExtraction(Extraction):
 
 class CommitRangeExtraction(Extraction):
     """This is basically the CommitExtraction, but for one range only."""
+
     def __init__(self, dbm, conf, resdir, csv_writer):
         Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
@@ -451,6 +453,7 @@ class CommitRangeExtraction(Extraction):
 
 class EmailRangeExtraction(Extraction):
     """This is basically the EmailExtraction, but for one range only."""
+
     def __init__(self, dbm, conf, resdir, csv_writer):
         Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
@@ -488,6 +491,7 @@ class EmailRangeExtraction(Extraction):
                     # LIMIT 10
                 """
 
+
 class FunctionImplementationRangeExtraction(Extraction):
     def __init__(self, dbm, conf, resdir, csv_writer):
         Extraction.__init__(self, dbm, conf, resdir, csv_writer)
@@ -501,7 +505,7 @@ class FunctionImplementationRangeExtraction(Extraction):
 
                     FROM project p
 
-		    # get release range for projects
+                    # get release range for projects
                     JOIN release_range r ON p.id = r.projectId
 
                     # start of range
