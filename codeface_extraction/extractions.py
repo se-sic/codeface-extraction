@@ -15,6 +15,7 @@
 # Copyright 2015-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2016 by Thomas Bock <bockthom@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
+# Copyright 2018 by Tina Schuh <schuhtb@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file provides the class 'Extraction' and all of its subclasses.
@@ -24,6 +25,7 @@ import itertools
 import os
 import unicodedata
 import re
+import codecs
 
 from codeface.cli import log
 
@@ -536,18 +538,28 @@ def remove_problematic_characters(text):
     """
     Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
     string where all control characters have been replaced by a space.
-
-    More information:
-    and
     """
 
-    # encode as UTF-8
-    new_text = text.encode("utf-8")
-    # remove unicode characters from "Specials" block
-    # see: https://www.compart.com/en/unicode/block/U+FFF0
-    new_text = re.sub(r"\\ufff.", " ", new_text)
-    # remove all kinds of control characters
+    if isinstance(text, unicode):
+
+        # deal with encoding (NOTE: Back-up plan, instead of next 3 lines use the FTFY library to convert to most likely encoding)
+        new_text = text.encode("unicode-escape")
+        new_text, x = codecs.escape_decode(new_text, "utf-8")
+        new_text = unicode(new_text, "utf-8", "replace")
+
+        # remove unicode characters from "Specials" block
+        # see: https://www.compart.com/en/unicode/block/U+FFF0
+        new_text = re.sub(r"\\ufff.", " ", new_text.encode("unicode-escape"))
+
+    else:  # TODO: does this ever apply? and if yes, does it (still) work?
+
+        new_text = text.encode("utf-8")
+        # remove unicode characters from "Specials" block
+        # see: https://www.compart.com/en/unicode/block/U+FFF0
+        new_text = re.sub(r"\\ufff.", " ", new_text.decode("utf-8")).encode("utf-8")
+
+    # remove all kinds of control characters and emojis
     # see: https://www.fileformat.info/info/unicode/category/index.htm
-    new_text = "".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in new_text.decode("unicode-escape"))
+    new_text = u"".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in new_text.decode("unicode-escape"))
 
     return new_text
