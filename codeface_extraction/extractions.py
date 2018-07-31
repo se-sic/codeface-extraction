@@ -25,7 +25,7 @@ import itertools
 import os
 import unicodedata
 import re
-import codecs
+from ftfy import fix_encoding
 
 from codeface.cli import log
 
@@ -542,25 +542,16 @@ def remove_problematic_characters(text):
     """
     Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
     string where all control characters have been replaced by a space.
+    :param text: expects a unicode string
+    :return: unicode string
     """
 
-    if isinstance(text, unicode):
+    # deal with encoding
+    new_text = fix_encoding(text)
 
-        # deal with encoding (NOTE: Back-up plan, instead of next 3 lines use the FTFY library to convert to most likely encoding)
-        new_text = text.encode("unicode-escape")
-        new_text, x = codecs.escape_decode(new_text, "utf-8")
-        new_text = unicode(new_text, "utf-8", "replace")
-
-        # remove unicode characters from "Specials" block
-        # see: https://www.compart.com/en/unicode/block/U+FFF0
-        new_text = re.sub(r"\\ufff.", " ", new_text.encode("unicode-escape"))
-
-    else:  # TODO: does this ever apply? and if yes, does it (still) work?
-
-        new_text = text.encode("utf-8")
-        # remove unicode characters from "Specials" block
-        # see: https://www.compart.com/en/unicode/block/U+FFF0
-        new_text = re.sub(r"\\ufff.", " ", new_text.decode("utf-8")).encode("utf-8")
+    # remove unicode characters from "Specials" block
+     # see: https://www.compart.com/en/unicode/block/U+FFF0
+    new_text = re.sub(r"\\ufff.", " ", new_text.encode("unicode-escape"))
 
     # remove all kinds of control characters and emojis
     # see: https://www.fileformat.info/info/unicode/category/index.htm
