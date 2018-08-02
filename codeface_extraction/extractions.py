@@ -301,6 +301,11 @@ class CommitMessageExtraction(Extraction):
                     ORDER BY c.authorDate
                 """
 
+    def _reduce_result(self, result):
+        # remove problematic characters from description column
+        return [(commitId, commitHash, remove_problematic_characters(description))
+                for (commitId, commitHash, description) in result]
+
 
 # Extraction of function implementations
 class FunctionImplementationExtraction(Extraction):
@@ -505,6 +510,11 @@ class CommitMessageRangeExtraction(Extraction):
 
                     ORDER BY c.authorDate
                 """
+
+    def _reduce_result(self, result):
+        # remove problematic characters from description column
+        return [(commitId, commitHash, remove_problematic_characters(description))
+                for (commitId, commitHash, description) in result]
 
 
 class EmailRangeExtraction(Extraction):
