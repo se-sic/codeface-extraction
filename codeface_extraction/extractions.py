@@ -14,6 +14,8 @@
 #
 # Copyright 2015-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2016 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
+# Copyright 2018 by Tina Schuh <schuht@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file provides the class 'Extraction' and all of its subclasses.
@@ -21,6 +23,9 @@ This file provides the class 'Extraction' and all of its subclasses.
 
 import itertools
 import os
+import unicodedata
+import re
+from ftfy import fix_encoding
 
 from codeface.cli import log
 
@@ -30,12 +35,15 @@ from codeface.cli import log
 #
 
 
-def get_extractions(dbm, conf, resdir, csv_writer):
+def get_extractions(dbm, conf, resdir, csv_writer, extract_impl, extract_on_range_level):
     # all extractions are sublcasses of Extraction:
     # instantiate them all!
     __extractions = []
     for cls in Extraction.__subclasses__():
-        __extractions.append(cls(dbm, conf, resdir, csv_writer))
+        if (extract_impl or
+                (str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationExtraction'>" and
+                 str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationRangeExtraction'>")):
+            __extractions.append(cls(dbm, conf, resdir, csv_writer))
 
     # group extractions by "project-levelness"
     __extractions_grouped = dict(
@@ -43,8 +51,12 @@ def get_extractions(dbm, conf, resdir, csv_writer):
         for key, extractions in
         itertools.groupby(__extractions, lambda y: y.is_project_level())
     )
+
     __extractions_project = __extractions_grouped[True]
-    __extractions_range = __extractions_grouped[False]
+    if (extract_on_range_level):
+        __extractions_range = __extractions_grouped[False]
+    else:
+        __extractions_range = []
 
     return __extractions_project, __extractions_range
 
@@ -267,6 +279,40 @@ class CommitExtraction(Extraction):
                 """
 
 
+# Extraction of function implementations
+class FunctionImplementationExtraction(Extraction):
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
+
+        self.file_name = "implementations.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT c.id, c.commitHash,
+                           cd.file, cd.entityId, cd.impl
+
+                    FROM project p
+
+                    # get commits for project
+                    JOIN commit c ON p.id = c.projectId
+
+                    # get commit meta-data
+                    LEFT JOIN commit_dependency cd ON c.id = cd.commitId
+
+                    # filter for current project
+                    WHERE p.name = '{project}'
+                    AND p.analysisMethod = '{tagging}'
+                    AND cd.file IS NOT NULL
+
+                    ORDER BY cd.file, cd.entityId, c.id, c.commitHash
+                """
+
+    def _reduce_result(self, result):
+        # remove problematic characters from implementation column
+        return [(commitId, commitHash, fileId, entityId, remove_problematic_characters(impl))
+                for (commitId, commitHash, fileId, entityId, impl) in result]
+
+
 class EmailExtraction(Extraction):
     def __init__(self, dbm, conf, resdir, csv_writer):
         Extraction.__init__(self, dbm, conf, resdir, csv_writer)
@@ -323,7 +369,7 @@ class RevisionExtraction(Extraction):
     def get_list(self):
         result = self._run_sql(None, None)
         lines = self._reduce_result(result)
-        return [rev for (rev,date) in lines]
+        return [rev for (rev, date) in lines]
 
 
 #
@@ -358,6 +404,7 @@ class AuthorRangeExtraction(Extraction):
 
 class CommitRangeExtraction(Extraction):
     """This is basically the CommitExtraction, but for one range only."""
+
     def __init__(self, dbm, conf, resdir, csv_writer):
         Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
@@ -406,6 +453,7 @@ class CommitRangeExtraction(Extraction):
 
 class EmailRangeExtraction(Extraction):
     """This is basically the EmailExtraction, but for one range only."""
+
     def __init__(self, dbm, conf, resdir, csv_writer):
         Extraction.__init__(self, dbm, conf, resdir, csv_writer)
 
@@ -442,3 +490,71 @@ class EmailRangeExtraction(Extraction):
 
                     # LIMIT 10
                 """
+
+
+class FunctionImplementationRangeExtraction(Extraction):
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
+
+        self.file_name = "implementations.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT c.id, c.commitHash,
+                           cd.file, cd.entityId, cd.impl
+
+                    FROM project p
+
+                    # get release range for projects
+                    JOIN release_range r ON p.id = r.projectId
+
+                    # start of range
+                    JOIN release_timeline l1 ON r.releaseStartId = l1.id
+                    # end of range
+                    JOIN release_timeline l2 ON r.releaseEndId = l2.id
+
+                    # add commits for the ranges
+                    JOIN commit c ON r.id = c.releaseRangeId
+
+                    # get commit meta-data
+                    LEFT JOIN commit_dependency cd ON c.id = cd.commitId
+
+                    # filter for current project and range
+                    WHERE p.name = '{project}'
+                    AND p.analysisMethod = '{tagging}'
+                    AND l2.tag = '{revision}'
+                    AND cd.file IS NOT NULL
+
+                    ORDER BY cd.file, cd.entityId, c.id, c.commitHash
+                """
+
+    def _reduce_result(self, result):
+        # remove problematic characters from implementation column
+        return [(commitId, commitHash, fileId, entityId, remove_problematic_characters(impl))
+                for (commitId, commitHash, fileId, entityId, impl) in result]
+
+
+#
+# HELPER FUNCTIONS
+#
+
+def remove_problematic_characters(text):
+    """
+    Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
+    string where all control characters have been replaced by a space.
+    :param text: expects a unicode string
+    :return: unicode string
+    """
+
+    # deal with encoding
+    new_text = fix_encoding(text)
+
+    # remove unicode characters from "Specials" block
+     # see: https://www.compart.com/en/unicode/block/U+FFF0
+    new_text = re.sub(r"\\ufff.", " ", new_text.encode("unicode-escape"))
+
+    # remove all kinds of control characters and emojis
+    # see: https://www.fileformat.info/info/unicode/category/index.htm
+    new_text = u"".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in new_text.decode("unicode-escape"))
+
+    return new_text
