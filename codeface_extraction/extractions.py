@@ -302,8 +302,8 @@ class CommitMessageExtraction(Extraction):
                 """
 
     def _reduce_result(self, result):
-        # remove problematic characters from description column
-        return [(commitId, commitHash, remove_problematic_characters(description))
+        # fix character encoding and remove problematic characters from description column
+        return [(commitId, commitHash, fix_characters_in_string(description))
                 for (commitId, commitHash, description) in result]
 
 
@@ -336,8 +336,8 @@ class FunctionImplementationExtraction(Extraction):
                 """
 
     def _reduce_result(self, result):
-        # remove problematic characters from implementation column
-        return [(commitId, commitHash, fileId, entityId, remove_problematic_characters(impl))
+        # fix character encoding and remove problematic characters from implementation column
+        return [(commitId, commitHash, fileId, entityId, fix_characters_in_string(impl))
                 for (commitId, commitHash, fileId, entityId, impl) in result]
 
 
@@ -512,8 +512,8 @@ class CommitMessageRangeExtraction(Extraction):
                 """
 
     def _reduce_result(self, result):
-        # remove problematic characters from description column
-        return [(commitId, commitHash, remove_problematic_characters(description))
+        # fix character encoding and remove problematic characters from description column
+        return [(commitId, commitHash, fix_characters_in_string(description))
                 for (commitId, commitHash, description) in result]
 
 
@@ -595,8 +595,8 @@ class FunctionImplementationRangeExtraction(Extraction):
                 """
 
     def _reduce_result(self, result):
-        # remove problematic characters from implementation column
-        return [(commitId, commitHash, fileId, entityId, remove_problematic_characters(impl))
+        # fix character encoding and remove problematic characters from implementation column
+        return [(commitId, commitHash, fileId, entityId, fix_characters_in_string(impl))
                 for (commitId, commitHash, fileId, entityId, impl) in result]
 
 
@@ -604,7 +604,7 @@ class FunctionImplementationRangeExtraction(Extraction):
 # HELPER FUNCTIONS
 #
 
-def remove_problematic_characters(text):
+def fix_characters_in_string(text):
     """
     Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
     string where all control characters have been replaced by a space.
