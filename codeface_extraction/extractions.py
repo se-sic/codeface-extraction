@@ -13,7 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2015-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
-# Copyright 2016 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2016, 2018 by Thomas Bock <bockthom@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018 by Tina Schuh <schuht@fim.uni-passau.de>
 # All Rights Reserved.
@@ -279,6 +279,29 @@ class CommitExtraction(Extraction):
                 """
 
 
+class CommitMessageExtraction(Extraction):
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
+
+        self.file_name = "commitMessages.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT c.id, c.commitHash, c.description
+
+                    FROM project p
+
+                    # get commits for project
+                    JOIN commit c ON p.id = c.projectId
+
+                    # filter for current project
+                    WHERE p.name = '{project}'
+                    AND p.analysisMethod = '{tagging}'
+
+                    ORDER BY c.authorDate
+                """
+
+
 # Extraction of function implementations
 class FunctionImplementationExtraction(Extraction):
     def __init__(self, dbm, conf, resdir, csv_writer):
@@ -448,6 +471,39 @@ class CommitRangeExtraction(Extraction):
                     ORDER BY c.authorDate, a.name, c.id, cd.file, cd.entityId
 
                     # LIMIT 10
+                """
+
+
+class CommitMessageRangeExtraction(Extraction):
+    """This is basically the CommitMessageExtraction, but for one range only."""
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
+
+        self.file_name = "commitMessages.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT c.id, c.commitHash, c.description
+
+                    FROM project p
+
+                    # get release range for projects
+                    JOIN release_range r ON p.id = r.projectId
+
+                    # start of range
+                    JOIN release_timeline l1 ON r.releaseStartId = l1.id
+                    # end of range
+                    JOIN release_timeline l2 ON r.releaseEndId = l2.id
+
+                    # add commits for the ranges
+                    JOIN commit c ON r.id = c.releaseRangeId
+
+                    # filter for current project
+                    WHERE p.name = '{project}'
+                    AND p.analysisMethod = '{tagging}'
+                    AND l2.tag = '{revision}'
+
+                    ORDER BY c.authorDate
                 """
 
 
