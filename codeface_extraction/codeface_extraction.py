@@ -58,28 +58,31 @@ def run_extraction(conf, resdir, extract_commit_messages, extract_impl, extract_
     for extraction in __extractions_project:
         extraction.run()
 
-    # check if list of revisions in database is the same as in the config file
-    revs = conf["revisions"]
-    list_of_revisions = extractions.RevisionExtraction(dbm, conf, resdir, csv_writer).get_list()
-    if revs:
-        if set(revs) != set(list_of_revisions):
-            log.error("List of revisions in configuration file do not match the list stored in the DB! Stopping now.")
-            sys.exit(1)
+    # run range-level extractions (only if explicitely enabled)
+    if extract_on_range_level:
+
+        # check if list of revisions in database is the same as in the config file
+        revs = conf["revisions"]
+        list_of_revisions = extractions.RevisionExtraction(dbm, conf, resdir, csv_writer).get_list()
+        if revs:
+            if set(revs) != set(list_of_revisions):
+                log.error("List of revisions in configuration file do not match the list stored in the DB! Stopping now.")
+                sys.exit(1)
+            else:
+                log.info("List of revisions in configuration file and DB match.")
         else:
-            log.info("List of revisions in configuration file and DB match.")
-    else:
-        log.info("No list of revisions found in configuration file, using the list from the DB instead!")
-        revs = list_of_revisions  # set list of revisions as stored in the database
+            log.info("No list of revisions found in configuration file, using the list from the DB instead!")
+            revs = list_of_revisions  # set list of revisions as stored in the database
 
-    # for all revisions of this project
-    for i in range(len(revs) - 1):
-        start_rev = revs[i]
-        end_rev = revs[i + 1]
+        # for all revisions of this project
+        for i in range(len(revs) - 1):
+            start_rev = revs[i]
+            end_rev = revs[i + 1]
 
-        log.info("%s: Extracting data for version '%s'" % (conf["project"], end_rev))
+            log.info("%s: Extracting data for version '%s'" % (conf["project"], end_rev))
 
-        for extraction in __extractions_range:
-            extraction.run(start_rev, end_rev)
+            for extraction in __extractions_range:
+                extraction.run(start_rev, end_rev)
 
     log.info("Extraction complete!")
 
