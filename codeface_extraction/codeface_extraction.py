@@ -13,7 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2015-2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
-# Copyright 2016 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2016, 2018 by Thomas Bock <bockthom@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # All Rights Reserved.
 """
@@ -36,7 +36,7 @@ from csv_writer import csv_writer
 # RUN FOR ALL PROJECTS
 ##
 
-def run_extraction(conf, resdir, extract_impl, extract_on_range_level):
+def run_extraction(conf, resdir, extract_commit_messages, extract_impl, extract_on_range_level):
     """
     Runs the extraction process for the list of given parameters.
 
@@ -50,7 +50,9 @@ def run_extraction(conf, resdir, extract_impl, extract_on_range_level):
     dbm = DBManager(conf)
 
     # get all types of extractions, both project-level and range-level
-    __extractions_project, __extractions_range = extractions.get_extractions(dbm, conf, resdir, csv_writer, extract_impl, extract_on_range_level)
+    __extractions_project, __extractions_range = extractions.get_extractions(dbm, conf, resdir, csv_writer,
+                                                                             extract_commit_messages, extract_impl,
+                                                                             extract_on_range_level)
 
     # run project-level extractions
     for extraction in __extractions_project:
@@ -93,6 +95,8 @@ def get_parser():
                             default='codeface.conf')
     run_parser.add_argument('-p', '--project', help="Project configuration file",
                             required=True)
+    run_parser.add_argument('-m', '--commit-messages', help="Enable extraction of the commit messages",
+                            action='store_true')
     run_parser.add_argument('-i', '--implementation', help="Enable extraction of the source code of functions",
                             action='store_true')
     run_parser.add_argument('-r', '--range', help="Enable extraction of the data on range level",
@@ -112,13 +116,14 @@ def run():
     # - First make all the args absolute
     __resdir = abspath(args.resdir)
     __codeface_conf, __project_conf = map(abspath, (args.config, args.project))
+    __extract_commit_messages = args.commit_messages
     __extract_impl = args.implementation
     __extract_on_range_level = args.range
 
     # load configuration
     __conf = Configuration.load(__codeface_conf, __project_conf)
 
-    run_extraction(__conf, __resdir, __extract_impl, __extract_on_range_level)
+    run_extraction(__conf, __resdir, __extract_commit_messages, __extract_impl, __extract_on_range_level)
 
 
 if __name__ == '__main__':

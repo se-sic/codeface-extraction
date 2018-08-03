@@ -35,14 +35,21 @@ from codeface.cli import log
 #
 
 
-def get_extractions(dbm, conf, resdir, csv_writer, extract_impl, extract_on_range_level):
+def get_extractions(dbm, conf, resdir, csv_writer, extract_commit_messages, extract_impl, extract_on_range_level):
     # all extractions are sublcasses of Extraction:
     # instantiate them all!
     __extractions = []
     for cls in Extraction.__subclasses__():
-        if (extract_impl or
-                (str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationExtraction'>" and
-                 str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationRangeExtraction'>")):
+        if ((extract_impl and
+                (str(cls) == "<class 'codeface_extraction.extractions.FunctionImplementationExtraction'>" or
+                 str(cls) == "<class 'codeface_extraction.extractions.FunctionImplementationRangeExtraction'>")) or
+            (extract_commit_messages and
+                (str(cls) == "<class 'codeface_extraction.extractions.CommitMessageExtraction'>" or
+                 str(cls) == "<class 'codeface_extraction.extractions.CommitMessageRangeExtraction'>")) or
+            (str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationExtraction'>" and
+             str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationRangeExtraction'>" and
+             str(cls) != "<class 'codeface_extraction.extractions.CommitMessageExtraction'>" and
+             str(cls) != "<class 'codeface_extraction.extractions.CommitMessageRangeExtraction'>")):
             __extractions.append(cls(dbm, conf, resdir, csv_writer))
 
     # group extractions by "project-levelness"
