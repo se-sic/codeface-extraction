@@ -74,7 +74,7 @@ def run():
     # 1b) load the list of persons
     persons = load_csv(__srcdir_csv)
     # 2) re-format the issues
-    issues = parse_xml(issues, persons)
+    issues = parse_xml(issues, persons, args.skip_history)
     # 3) load issue information via api
     if not args.skip_history:
         load_issue_via_api(issues, persons, __conf['issueTrackerURL'])
@@ -88,7 +88,7 @@ def run():
     # 7) export for jira issue extraction to use them in dev-network-growth
     print_to_disk_extr(issues, __resdir)
     # 8) dump bug issues to disk
-    print_to_disk_bugs(issues, __resdir, args.skip_history)
+    print_to_disk_bugs(issues, __resdir)
 
     log.info("Jira issue processing complete!")
 
@@ -138,11 +138,12 @@ def merge_user_with_user_from_csv(user, persons):
     return new_user
 
 
-def parse_xml(issue_data, persons):
+def parse_xml(issue_data, persons, skip_history):
     """Parse issues from the xml-data
 
     :param issue_data: list of xml-files
     :param persons: list of persons from JIRA (incl. e-mail addresses)
+    :param skip_history: flag if the history will be loaded in a different method
     :return: list of parsed issues
     """
 
@@ -158,7 +159,6 @@ def parse_xml(issue_data, persons):
             comments = list()
             issue = dict()
             components = []
-            refs = []
 
             # parse values form xml
             # add issue values to the issue
@@ -183,25 +183,48 @@ def parse_xml(issue_data, persons):
 
             type = issue_x.getElementsByTagName('type')[0]
             issue['type'] = type.firstChild.data
+            # new consistent format with GitHub issues. Not supported by the network library yet
+            issue['type_new'] = ['issue', str(type.firstChild.data.lower())]
 
             status = issue_x.getElementsByTagName('status')[0]
             issue['state'] = status.firstChild.data
+            # new consistent format with GitHub issues. Not supported by the network library yet
+            issue['state_new'] = status.firstChild.data.lower()
 
             project = issue_x.getElementsByTagName('project')[0]
             issue['projectId'] = project.attributes['id'].value
 
             resolution = issue_x.getElementsByTagName('resolution')[0]
             issue['resolution'] = resolution.firstChild.data
+            # new consistent format with GitHub issues. Not supported by the network library yet
+            issue['resolution_new'] = [str(resolution.firstChild.data.lower())]
+
+            # consistency to default GitHub labels
+            if issue['resolution'] == "Won't Fix":
+                issue['resolution_new'] = ['wontfix']
+
+            # consistency to default GitHub labels
+            if issue['resolution'] == "Won't Do":
+                issue['resolution_new'] = ['wontdo']
 
             for component in issue_x.getElementsByTagName('component'):
-                components.append(component.firstChild.data)
+                components.append(str(component.firstChild.data))
             issue['components'] = components
 
-            for ref in issue_x.getElementsByTagName('issuelinktype'):
-                refId = ref.getElementsByTagName('issuekey')[0].firstChild.data
-                refType = ref.getElementsByTagName('name')[0].firstChild.data
-                refs.append((refId, refType))
-            issue['references'] = refs
+            # if links are not loaded via api, they are added as a history event with less information
+            if skip_history:
+                issue['history'] = []
+                for ref in issue_x.getElementsByTagName('issuelinktype'):
+                    history = dict()
+                    history['event'] = 'add_link'
+                    history["author"] = dict()
+                    history["author"]["name"] = ''
+                    history["author"]["email"] = ''
+                    history['date'] = ''
+                    history['event_info_1'] = ref.getElementsByTagName('issuekey')[0].firstChild.data
+                    history['event_info_2'] = "issue"
+
+                    issue['history'].append(history)
 
             reporter = issue_x.getElementsByTagName('reporter')[0]
             user = dict()
@@ -275,54 +298,138 @@ def load_issue_via_api(issues, persons, url):
 
     for issue in issues:
 
-        last_checked = issue['creationDate']  # needed to update state and resolution on creation for comments
+        def format_time(time):
+            """The time from the API is formatted to the consistent format
+
+                    :param time to be formatted
+                    :return the formatted time
+                """
+
+            d = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f+0000")
+            return d.strftime('%Y-%m-%d %H:%M:%S')
+
         api_issue = jira_project.issue(issue['externalId'], expand='changelog')
         changelog = api_issue.changelog
         histories = list()
 
+        # adds the issue creation time with the default state to an list
+        # list is needed to find out the state the issue had when a comment was written
+        state_changes = [[issue['creationDate'], "open"]]
+
+        # adds the issue creation time with the default resolution to an list
+        # list is needed to find out the resolution the issue had when a comment was written
+        resolution_changes = [[issue['creationDate'], "unresolved"]]
+
         # history changes get visited in time order from oldest to newest
         for change in changelog.histories:
 
-            old_state, new_state, old_resolution, new_resolution = None, None, None, None
+            # default values for state and resolution
+            old_state, new_state, old_resolution, new_resolution = 'open', 'open', 'unresolved', 'unresolved'
 
+            # all changes in the issue changelog are checked if they contain an useful information
             for item in change.items:
 
+                # state_updated event gets created and added to the issue history
                 if item.field == 'status':
-                    old_state = item.fromString
-                    new_state = item.toString
+                    old_state = item.fromString.lower()
+                    new_state = item.toString.lower()
+                    history = dict()
+                    history['event'] = 'state_updated'
+                    history['event_info_1'] = new_state
+                    history['event_info_2'] = old_state
+                    user = dict()
+                    user["username"] = change.author.name
+                    user["name"] = change.author.name
+                    user["email"] = ""
+                    history["author"] = merge_user_with_user_from_csv(user, persons)
+                    history['date'] = format_time(change.created)
+                    histories.append(history)
+                    state_changes.append([history['date'], new_state])
 
+                # resolution_updated event gets created and added to the issue history
                 elif item.field == 'resolution':
-                    old_resolution = item.fromString
-                    new_resolution = item.toString
+                    if item.fromString is not None:
+                        old_resolution = item.fromString.lower()
+                    if item.toString is not None:
+                        new_resolution = item.toString.lower()
+                    history = dict()
+                    history['event'] = 'resolution_updated'
+                    history['event_info_1'] = new_resolution
+                    history['event_info_2'] = old_resolution
+                    user = dict()
+                    user["username"] = change.author.name
+                    user["name"] = change.author.name
+                    user["email"] = ""
+                    history["author"] = merge_user_with_user_from_csv(user, persons)
+                    history['date'] = format_time(change.created)
+                    histories.append(history)
+                    resolution_changes.append([history['date'], new_resolution])
 
-            # only history entries that change the state or the resolution are interesting
-            if (old_state != new_state) | (old_resolution != new_resolution):
-                if (old_resolution is None) & (new_resolution is not None):  # adjust to xml information
-                    old_resolution = "Unresolved"
-                history = dict()
-                history['new_state'] = new_state
-                history['new_resolution'] = new_resolution
-                user = dict()
-                user["username"] = change.author.name
-                user["name"] = change.author.name
-                user["email"] = ""
-                history["author"] = merge_user_with_user_from_csv(user, persons)
-                date = change.created
-                d = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f+0000")
-                history['date'] = d.strftime('%Y-%m-%d %H:%M:%S')
+                # assigned event gets created and added to the issue history
+                elif item.field == 'assignee':
+                    history = dict()
+                    history['event'] = 'assigned'
+                    user = dict()
+                    user["username"] = change.author.name
+                    user["name"] = change.author.name
+                    user["email"] = ""
+                    history["author"] = merge_user_with_user_from_csv(user, persons)
+                    assignee = dict()
+                    assignee["username"] = str(item.toString)
+                    assignee["name"] = str(item.toString)
+                    assignee["email"] = ""
+                    assigned_user = merge_user_with_user_from_csv(assignee, persons)
+                    history['event_info_1'] = assigned_user['name']
+                    history['event_info_2'] = assigned_user['email']
+                    history['date'] = format_time(change.created)
+                    histories.append(history)
 
-                # updates state and resolution on creation for comments
-                for comment in issue['comments']:
+                elif item.field == 'Link':
+                    # add_link event gets created and added to the issue history
+                    if item.toString is not None:
+                        history = dict()
+                        history['event'] = 'add_link'
+                        user = dict()
+                        user["username"] = change.author.name
+                        user["name"] = change.author.name
+                        user["email"] = ""
+                        history["author"] = merge_user_with_user_from_csv(user, persons)
+                        # api returns a text. The issueId is at the end of the text and gets extracted
+                        history['event_info_1'] = item.toString.split()[-1]
+                        history['event_info_2'] = "issue"
+                        history['date'] = format_time(change.created)
+                        histories.append(history)
 
-                    # if-block checks between which history entries the comment was created to update the state and
-                    # the resolution on creation
-                    if (last_checked <= comment['changeDate']) & (comment['changeDate'] < history['date']):
-                        comment['state_on_creation'] = old_state
-                        comment['resolution_on_creation'] = old_resolution
+                    # remove_link event gets created and added to the issue history
+                    if item.fromString is not None:
+                        history = dict()
+                        history['event'] = 'remove_link'
+                        user = dict()
+                        user["username"] = change.author.name
+                        user["name"] = change.author.name
+                        user["email"] = ""
+                        history["author"] = merge_user_with_user_from_csv(user, persons)
+                        # api returns a text. Th issue id is at the end of the text and gets extracted
+                        history['event_info_1'] = item.fromString.split()[-1]
+                        history['event_info_2'] = "issue"
+                        history['date'] = format_time(change.created)
+                        histories.append(history)
 
-                last_checked = history['date']
+        # state and resolution change lists get sorted by time
+        state_changes.sort(key=lambda x: x[0])
+        resolution_changes.sort(key=lambda x: x[0])
 
-                histories.append(history)
+        for comment in issue['comments']:
+
+            # the state the issue had when the comment was written is searched out
+            for state in state_changes:
+                if comment['changeDate'] > state[0]:
+                    comment['state_on_creation'] = state[1]
+
+            # the resolution the issue had when the comment was written is searched out
+            for resolution in resolution_changes:
+                if comment['changeDate'] > resolution[0]:
+                    comment['resolution_on_creation'] = [str(resolution[1])]
 
         issue['history'] = histories
 
@@ -432,12 +539,13 @@ def print_to_disk(issues, results_folder):
     csv_writer.write_to_csv(output_file, lines)
 
 
-def print_to_disk_bugs(issues, results_folder, skip_history):
+def print_to_disk_bugs(issues, results_folder):
     """Sorts of bug issues and prints them to file 'bugs-jira.list' in result folder
+    This method prints in a new format which is consistent to the GitHub format.
+    When the network library is updated this format shall be used in all print to disk methods.
 
     :param issues: the issues to sort of bugs
     :param results_folder: the folder where to place 'bugs-jira.list' output file
-    :param skip_history: flag if history informations got retrieved and can be printed to the output file
     """
 
     # construct path to output file
@@ -450,77 +558,72 @@ def print_to_disk_bugs(issues, results_folder, skip_history):
         log.info("Current issue '{}'".format(issue['externalId']))
 
         # only writes issues with type bug and their comments in the output file
-        if issue['type'] == "Bug":
+        if 'bug' in issue['type_new']:
             lines.append((
                 issue['externalId'],
-                issue['state'],
-                issue['resolution'],
+                issue['type_new'],
+                issue['state_new'],
+                issue['resolution_new'],
                 issue['creationDate'],
                 issue['resolveDate'],
-                False,  ## Value of is.pull.request
+                issue['components'],
+                "created",  ## event.name
                 issue['author']['name'],
                 issue['author']['email'],
                 issue['creationDate'],
-                issue['references'],
-                "open",  ## event.name
-                issue['components'],
-                "Open", ## default state when created
-                "Unresolved" ## default resolution when created
+                "open",  ## default state when created
+                ["unresolved"]  ## default resolution when created
             ))
 
             lines.append((
                 issue['externalId'],
-                issue['state'],
-                issue['resolution'],
+                issue['type_new'],
+                issue['state_new'],
+                issue['resolution_new'],
                 issue['creationDate'],
                 issue['resolveDate'],
-                False,  ## Value of is.pull.request
+                issue['components'],
+                "commented",
                 issue['author']['name'],
                 issue['author']['email'],
                 issue['creationDate'],
-                "",  ## ref.name
-                "commented",  ## event.name
-                "",  ##components
-                "Open",  ##  default state when created
-                "Unresolved"  ## default resolution when created
+                "open",  ##  default state when created
+                "unresolved"  ## default resolution when created
             ))
 
             for comment in issue["comments"]:
                 lines.append((
                     issue['externalId'],
-                    issue['state'],
-                    issue['resolution'],
+                    issue['type_new'],
+                    issue['state_new'],
+                    issue['resolution_new'],
                     issue['creationDate'],
                     issue['resolveDate'],
-                    False,  ## Value of is.pull.request
+                    issue['components'],
+                    "commented",
                     comment['author']['name'],
                     comment['author']['email'],
                     comment['changeDate'],
-                    "",  ## ref.name
-                    "commented",  ## event.name
-                    "",  ##components
                     comment['state_on_creation'],
                     comment['resolution_on_creation']
                 ))
 
-            if not skip_history:
-                for history in issue['history']:
-                    lines.append((
-                        issue['externalId'],
-                        issue['state'],
-                        issue['resolution'],
-                        issue['creationDate'],
-                        issue['resolveDate'],
-                        False,  ## Value of is.pull.request
-                        history['author']['name'],
-                        history['author']['email'],
-                        history['date'],
-                        "",  ## ref.name
-                        "updated",  ## event.name
-                        "",  ##components
-                        history['new_state'],
-                        history['new_resolution']
-                    ))
+            for history in issue['history']:
+                lines.append((
+                    issue['externalId'],
+                    issue['type_new'],
+                    issue['state_new'],
+                    issue['resolution_new'],
+                    issue['creationDate'],
+                    issue['resolveDate'],
+                    issue['components'],
+                    history['event'],
+                    history['author']['name'],
+                    history['author']['email'],
+                    history['date'],
+                    history['event_info_1'],
+                    history['event_info_2']
+                ))
 
     # write to output file
     csv_writer.write_to_csv(output_file, lines)
@@ -581,6 +684,7 @@ def print_to_disk_extr(issues, results_folder):
                 "",  ## ref.name
                 "commented"  ## event.name
             ))
+
     # write to output file
     csv_writer.write_to_csv(output_file, lines)
 
