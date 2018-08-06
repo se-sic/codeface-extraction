@@ -483,6 +483,7 @@ def print_to_disk_new(issues, results_folder):
         for event in issue["eventsList"]:
             lines.append((
                 issue["number"],
+                issue["title"],
                 issue["type"],
                 issue["state_new"],
                 issue["resolution"],

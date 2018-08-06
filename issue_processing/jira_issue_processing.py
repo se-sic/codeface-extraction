@@ -178,6 +178,9 @@ def parse_xml(issue_data, persons, skip_history):
                 d = datetime.strptime(resolveDate, '%a, %d %b %Y %H:%M:%S +0000')
                 issue['resolveDate'] = d.strftime('%Y-%m-%d %H:%M:%S')
 
+            title = issue_x.getElementsByTagName('title')[0]
+            issue['title'] = title.firstChild.data
+
             link = issue_x.getElementsByTagName('link')[0]
             issue['url'] = link.firstChild.data
 
@@ -561,6 +564,7 @@ def print_to_disk_bugs(issues, results_folder):
         if 'bug' in issue['type_new']:
             lines.append((
                 issue['externalId'],
+                issue['title'],
                 issue['type_new'],
                 issue['state_new'],
                 issue['resolution_new'],
@@ -577,6 +581,7 @@ def print_to_disk_bugs(issues, results_folder):
 
             lines.append((
                 issue['externalId'],
+                issue['title'],
                 issue['type_new'],
                 issue['state_new'],
                 issue['resolution_new'],
@@ -594,6 +599,7 @@ def print_to_disk_bugs(issues, results_folder):
             for comment in issue["comments"]:
                 lines.append((
                     issue['externalId'],
+                    issue['title'],
                     issue['type_new'],
                     issue['state_new'],
                     issue['resolution_new'],
@@ -611,6 +617,7 @@ def print_to_disk_bugs(issues, results_folder):
             for history in issue['history']:
                 lines.append((
                     issue['externalId'],
+                    issue['title'],
                     issue['type_new'],
                     issue['state_new'],
                     issue['resolution_new'],
