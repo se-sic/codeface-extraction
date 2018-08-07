@@ -13,7 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2015-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
-# Copyright 2016 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2016, 2018 by Thomas Bock <bockthom@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018 by Tina Schuh <schuht@fim.uni-passau.de>
 # All Rights Reserved.
@@ -35,14 +35,23 @@ from codeface.cli import log
 #
 
 
-def get_extractions(dbm, conf, resdir, csv_writer, extract_impl, extract_on_range_level):
-    # all extractions are sublcasses of Extraction:
+def get_extractions(dbm, conf, resdir, csv_writer, extract_commit_messages, extract_impl, extract_on_range_level):
+    # all extractions are subclasses of Extraction:
     # instantiate them all!
     __extractions = []
+
+    # check which extractions to skip
+    extractions_to_skip = []
+    if not extract_commit_messages:
+        extractions_to_skip += ["<class 'codeface_extraction.extractions.CommitMessageExtraction'>"]
+        extractions_to_skip += ["<class 'codeface_extraction.extractions.CommitMessageRangeExtraction'>"]
+    if not extract_impl:
+        extractions_to_skip += ["<class 'codeface_extraction.extractions.FunctionImplementationExtraction'>"]
+        extractions_to_skip += ["<class 'codeface_extraction.extractions.FunctionImplementationRangeExtraction'>"]
+
+    # collect all extractions (except for the ones to skip) and instantiate objects
     for cls in Extraction.__subclasses__():
-        if (extract_impl or
-                (str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationExtraction'>" and
-                 str(cls) != "<class 'codeface_extraction.extractions.FunctionImplementationRangeExtraction'>")):
+        if (str(cls) not in extractions_to_skip):
             __extractions.append(cls(dbm, conf, resdir, csv_writer))
 
     # group extractions by "project-levelness"
@@ -279,6 +288,34 @@ class CommitExtraction(Extraction):
                 """
 
 
+class CommitMessageExtraction(Extraction):
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
+
+        self.file_name = "commitMessages.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT c.id, c.commitHash, c.description
+
+                    FROM project p
+
+                    # get commits for project
+                    JOIN commit c ON p.id = c.projectId
+
+                    # filter for current project
+                    WHERE p.name = '{project}'
+                    AND p.analysisMethod = '{tagging}'
+
+                    ORDER BY c.authorDate
+                """
+
+    def _reduce_result(self, result):
+        # fix character encoding and remove problematic characters from description column
+        return [(commitId, commitHash, fix_characters_in_string(description))
+                for (commitId, commitHash, description) in result]
+
+
 # Extraction of function implementations
 class FunctionImplementationExtraction(Extraction):
     def __init__(self, dbm, conf, resdir, csv_writer):
@@ -308,8 +345,8 @@ class FunctionImplementationExtraction(Extraction):
                 """
 
     def _reduce_result(self, result):
-        # remove problematic characters from implementation column
-        return [(commitId, commitHash, fileId, entityId, remove_problematic_characters(impl))
+        # fix character encoding and remove problematic characters from implementation column
+        return [(commitId, commitHash, fileId, entityId, fix_characters_in_string(impl))
                 for (commitId, commitHash, fileId, entityId, impl) in result]
 
 
@@ -451,6 +488,44 @@ class CommitRangeExtraction(Extraction):
                 """
 
 
+class CommitMessageRangeExtraction(Extraction):
+    """This is basically the CommitMessageExtraction, but for one range only."""
+    def __init__(self, dbm, conf, resdir, csv_writer):
+        Extraction.__init__(self, dbm, conf, resdir, csv_writer)
+
+        self.file_name = "commitMessages.list"
+
+        # for subclasses
+        self.sql = """
+                    SELECT c.id, c.commitHash, c.description
+
+                    FROM project p
+
+                    # get release range for projects
+                    JOIN release_range r ON p.id = r.projectId
+
+                    # start of range
+                    JOIN release_timeline l1 ON r.releaseStartId = l1.id
+                    # end of range
+                    JOIN release_timeline l2 ON r.releaseEndId = l2.id
+
+                    # add commits for the ranges
+                    JOIN commit c ON r.id = c.releaseRangeId
+
+                    # filter for current project
+                    WHERE p.name = '{project}'
+                    AND p.analysisMethod = '{tagging}'
+                    AND l2.tag = '{revision}'
+
+                    ORDER BY c.authorDate
+                """
+
+    def _reduce_result(self, result):
+        # fix character encoding and remove problematic characters from description column
+        return [(commitId, commitHash, fix_characters_in_string(description))
+                for (commitId, commitHash, description) in result]
+
+
 class EmailRangeExtraction(Extraction):
     """This is basically the EmailExtraction, but for one range only."""
 
@@ -529,8 +604,8 @@ class FunctionImplementationRangeExtraction(Extraction):
                 """
 
     def _reduce_result(self, result):
-        # remove problematic characters from implementation column
-        return [(commitId, commitHash, fileId, entityId, remove_problematic_characters(impl))
+        # fix character encoding and remove problematic characters from implementation column
+        return [(commitId, commitHash, fileId, entityId, fix_characters_in_string(impl))
                 for (commitId, commitHash, fileId, entityId, impl) in result]
 
 
@@ -538,7 +613,7 @@ class FunctionImplementationRangeExtraction(Extraction):
 # HELPER FUNCTIONS
 #
 
-def remove_problematic_characters(text):
+def fix_characters_in_string(text):
     """
     Removes control characters such as \r\n \x1b \ufffd from string impl and returns a unicode
     string where all control characters have been replaced by a space.
