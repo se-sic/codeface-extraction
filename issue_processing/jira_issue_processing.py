@@ -334,8 +334,10 @@ def load_issue_via_api(issues, persons, url):
 
                 # state_updated event gets created and added to the issue history
                 if item.field == 'status':
-                    old_state = item.fromString.lower()
-                    new_state = item.toString.lower()
+                    if item.fromString is not None:
+                        old_state = item.fromString.lower()
+                    if item.toString is not None:
+                        new_state = item.toString.lower()
                     history = dict()
                     history['event'] = 'state_updated'
                     history['event_info_1'] = new_state
@@ -544,7 +546,7 @@ def print_to_disk(issues, results_folder):
 
 def print_to_disk_bugs(issues, results_folder):
     """Sorts of bug issues and prints them to file 'bugs-jira.list' in result folder
-    This method prints in a new format which is consistent to the GitHub format.
+    This method prints in a new format which is consistent to the new GitHub format.
     When the network library is updated this format shall be used in all print to disk methods.
 
     :param issues: the issues to sort of bugs
@@ -691,7 +693,6 @@ def print_to_disk_extr(issues, results_folder):
                 "",  ## ref.name
                 "commented"  ## event.name
             ))
-
     # write to output file
     csv_writer.write_to_csv(output_file, lines)
 

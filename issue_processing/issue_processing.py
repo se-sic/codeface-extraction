@@ -131,12 +131,12 @@ def reformat(issue_data):
 
     # known resolutions from JIRA and GitHub default labels
     known_resolutions = {"unresolved", "fixed", "wontfix", "duplicate", "invalid", "incomplete",
-                               "cannot reproduce", "later", "not a problem", "implemented", "done",
-                               "auto closed",
-                               "pending", "closed", "remind", "resolved", "not a bug", "workaround",
-                               "staged",
-                               "delivered", "information provided", "works for me", "feedback received",
-                               "wontdo"}
+                         "cannot reproduce", "later", "not a problem", "implemented", "done",
+                         "auto closed",
+                         "pending", "closed", "remind", "resolved", "not a bug", "workaround",
+                         "staged",
+                         "delivered", "information provided", "works for me", "feedback received",
+                         "wontdo"}
 
     # re-process all issues
     for issue in issue_data:
@@ -259,15 +259,15 @@ def reformat(issue_data):
             # formats the event according to it's event type
             if event["event"] == "closed":
                 event["event"] = "state_updated"
-                event["event_info_1"] = "closed"
-                event["event_info_2"] = "open"
+                event["event_info_1"] = "closed"  # new state
+                event["event_info_2"] = "open"  # old state
                 # creates new state change object
                 state_changes.append([event['created_at'], "closed"])
 
             elif event["event"] == "reopened":
                 event["event"] = "state_updated"
-                event["event_info_1"] = "open"
-                event["event_info_2"] = "closed"
+                event["event_info_1"] = "open"  # new state
+                event["event_info_2"] = "closed"  # old state
                 # creates new resolution change object
                 state_changes.append([event['created_at'], "open"])
 
@@ -324,7 +324,7 @@ def reformat(issue_data):
         state_changes.sort(key=lambda x: x[0])
         resolution_changes.sort(key=lambda x: x[0])
 
-        # add event name to comment and add reference target
+        # the format of every comment is adjusted to the event format
         for comment in issue["commentsList"]:
             comment["event"] = "commented"
             comment["ref_target"] = ""
@@ -419,7 +419,6 @@ def insert_user_data(issues, conf):
         # check database for event authors
         for event in issue["eventsList"]:
             # get the event user from the DB
-
             event["user"] = get_or_update_user(event["user"])
             # get the reference-target user from the DB if needed
             if event["ref_target"] != "":
