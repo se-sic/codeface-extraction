@@ -34,8 +34,18 @@ from codeface.cli import log
 from codeface.cluster.idManager import idManager
 from codeface.configuration import Configuration
 from codeface.dbmanager import DBManager
+from dateutil import parser as dateparser
 
 from csv_writer import csv_writer
+
+# known types from JIRA and GitHub default labels
+known_types = {"bug", "improvement", "enhancement", "new feature", "task", "test", "wish"}
+
+# known resolutions from JIRA and GitHub default labels
+known_resolutions = {"unresolved", "fixed", "wontfix", "duplicate", "invalid", "incomplete", "cannot reproduce",
+                     "later", "not a problem", "implemented", "done", "auto closed", "pending", "closed", "remind",
+                     "resolved", "not a bug", "workaround", "staged", "delivered", "information provided",
+                     "works for me", "feedback received", "wontdo"}
 
 
 def run():
@@ -60,10 +70,14 @@ def run():
     # 1) load the list of issues
     issues = load(__srcdir)
     # 2) re-format the issues
-    issues = reformat(issues)
-    # 3) update user data with Codeface database
+    issues = reformat_issues(issues)
+    # 3) merges all issue events into one list
+    issues = merge_issue_events(issues)
+    # 4) re-format the eventsList of the issues
+    issues = reformat_events(issues)
+    # 5) update user data with Codeface database
     issues = insert_user_data(issues, __conf)
-    # 4) dump result to disk
+    # 6) dump result to disk
     print_to_disk(issues, __resdir)
     print_to_disk_new(issues, __resdir)
 
@@ -91,8 +105,21 @@ def load(source_folder):
     return issue_data
 
 
-def reformat(issue_data):
-    """Re-arrange issue data structure.
+def format_time(time):
+    """
+    Format times from different sources to a consistent time format
+
+    :param time: the time that shall be formatted
+    :return: the formatted time
+    """
+
+    d = dateparser.parse(time)
+    return d.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def reformat_issues(issue_data):
+    """
+    Re-arrange issue data structure.
 
     :param issue_data: the issue data to re-arrange
     :return: the re-arranged issue data
@@ -100,48 +127,8 @@ def reformat(issue_data):
 
     log.devinfo("Re-arranging Github issues...")
 
-    def format_time(time):
-        """Tries to format times from different sources to a consistent time format
-
-        :param time: the time that shall be formatted
-        :return: the formatted time
-        """
-
-        try:
-            # format from new GitHub-Wrapper files
-            d = datetime.strptime(time, '%Y-%m-%dT%H:%M:%SZ')
-            return d.strftime('%Y-%m-%d %H:%M:%S')
-        except ValueError:
-            # format from new GitHub-Wrapper files with no seconds
-            try:
-                d = datetime.strptime(time, '%Y-%m-%dT%H:%MZ')
-                return d.strftime('%Y-%m-%d %H:%M:%S')
-            except ValueError:
-                try:
-                    # format of relatedCommits time
-                    d = datetime.strptime(time, '%Y-%m-%dT%H:%M:%S+%f:00')
-                    return d.strftime('%Y-%m-%d %H:%M:%S')
-                except ValueError:
-                    # if the given time format is not know it can't be formatted, so it just gets returned
-                    # also happens if the time already has the correct format (old GitHub-Wrapper files)
-                    return time
-
-    # known types from JIRA and GitHub default labels
-    known_types = {"bug", "improvement", "enhancement", "new feature", "task", "test", "wish"}
-
-    # known resolutions from JIRA and GitHub default labels
-    known_resolutions = {"unresolved", "fixed", "wontfix", "duplicate", "invalid", "incomplete",
-                         "cannot reproduce", "later", "not a problem", "implemented", "done",
-                         "auto closed",
-                         "pending", "closed", "remind", "resolved", "not a bug", "workaround",
-                         "staged",
-                         "delivered", "information provided", "works for me", "feedback received",
-                         "wontdo"}
-
     # re-process all issues
     for issue in issue_data:
-        # temporary container for references
-        comments = dict()
 
         # empty container for issue types
         issue["type"] = []
@@ -150,8 +137,8 @@ def reformat(issue_data):
         issue["resolution"] = []
 
         # if an issue has no eventsList an empty Lists gets created
-        if issue['eventsList'] is None:
-            issue['eventsList'] = []
+        if issue["eventsList"] is None:
+            issue["eventsList"] = []
 
         # if an issue has no commentsList an empty Lists gets created
         if issue["commentsList"] is None:
@@ -165,15 +152,15 @@ def reformat(issue_data):
         if "relatedIssues" not in issue:
             issue["relatedIssues"] = []
 
-        # add 'closed_at' information if not present yet
+        # add "closed_at" information if not present yet
         if issue["closed_at"] is None:
             issue["closed_at"] = ""
 
         # parses the creation time in the correct format
-        issue['created_at'] = format_time(issue['created_at'])
+        issue["created_at"] = format_time(issue["created_at"])
 
         # parses the close time in the correct format
-        issue['closed_at'] = format_time(issue['closed_at'])
+        issue["closed_at"] = format_time(issue["closed_at"])
 
         # checks if the issue is a pull-request or a normal issue and adapts the type
         if issue["isPullRequest"]:
@@ -181,16 +168,23 @@ def reformat(issue_data):
         else:
             issue["type"].append("issue")
 
-        # brings the state to lowercase. Is needed for consistency reasons in the new file format
-        issue["state_new"] = issue["state"].lower()
+    return issue_data
 
-        # adds the issue creation time with the default state to an list
-        # list is needed to find out the state the issue had when a comment was written
-        state_changes = [[issue['created_at'], "open"]]
 
-        # adds the issue creation time with the default resolution to an list
-        # list is needed to find out the resolutions the issue had when a comment was written
-        resolution_changes = [[issue['created_at'], []]]
+def merge_issue_events(issue_data):
+    """
+    All issue events are merged together in the eventsList. This simplifies processing in later steps.
+
+    :param issue_data: the issue data from which the events shall be merged
+    :return: the issue data with merged eventsList
+    """
+
+    log.info("Merge issue events ...")
+
+    for issue in issue_data:
+
+        # temporary container for references
+        comments = dict()
 
         # adds creation event to eventsList
         created_event = dict()
@@ -200,6 +194,7 @@ def reformat(issue_data):
         created_event["event_info_1"] = "open"
         created_event["event_info_2"] = []
         issue["eventsList"].append(created_event)
+        issue["state_new"] = "open"
 
         # adds events for related issues to eventsList
         # GH-Wrapper doesn't provide information about time and user yet. Has to be updated if this changes
@@ -239,9 +234,27 @@ def reformat(issue_data):
 
             issue["eventsList"].append(link_event)
 
-        # updates format of every event in the eventsList of an issue
+        # the format of every comment is adjusted to the event format
+        for comment in issue["commentsList"]:
+            comment["event"] = "commented"
+            comment["ref_target"] = ""
+            comment["created_at"] = format_time(comment["created_at"])
+            if "event_info_1" not in comment:
+                comment["event_info_1"] = ""
+            if "event_info_2" not in comment:
+                comment["event_info_2"] = ""
+
+            # cache comment by date to resolve/re-arrange references later
+            comments[comment["created_at"]] = comment
+
+        # the format of every event is adjusted
         for event in issue["eventsList"]:
             event["ref_target"] = ""
+            event["created_at"] = format_time(event["created_at"])
+            if "event_info_1" not in event:
+                event["event_info_1"] = ""
+            if "event_info_2" not in event:
+                event["event_info_2"] = ""
 
             # if event collides with a comment
             if event["created_at"] in comments:
@@ -253,23 +266,45 @@ def reformat(issue_data):
                     event["ref_target"] = event["user"]
                     event["user"] = comment["user"]
 
-            # parses the event time in the correct format
-            event["created_at"] = format_time(event["created_at"])
+        # merge events and comment lists
+        issue["eventsList"] = issue["commentsList"] + issue["eventsList"]
 
-            # formats the event according to it's event type
+        # remove events without user
+        issue["eventsList"] = [event for event in issue["eventsList"] if
+                               not (event["user"] is None or event["ref_target"] is None)]
+
+        # sorts eventsList by time
+        issue["eventsList"] = sorted(issue["eventsList"], key=lambda k: k["created_at"])
+
+    return issue_data
+
+
+def reformat_events(issue_data):
+    """
+    Re-format event information dependent on the event type.
+
+    :param issue_data: the data of all issues that shall be re-formatted
+    :return: the issue data with updated event information
+    """
+
+    log.info("Update event information ...")
+
+    for issue in issue_data:
+
+        # re-format information of every event in the eventsList of an issue
+        for event in issue["eventsList"]:
+
             if event["event"] == "closed":
                 event["event"] = "state_updated"
                 event["event_info_1"] = "closed"  # new state
                 event["event_info_2"] = "open"  # old state
-                # creates new state change object
-                state_changes.append([event['created_at'], "closed"])
+                issue["state_new"] = "closed"
 
             elif event["event"] == "reopened":
                 event["event"] = "state_updated"
                 event["event_info_1"] = "open"  # new state
                 event["event_info_2"] = "closed"  # old state
-                # creates new resolution change object
-                state_changes.append([event['created_at'], "open"])
+                issue["state_new"] = "reopened"
 
             elif event["event"] == "labeled":
                 label = event["label"]["name"].lower()
@@ -303,56 +338,13 @@ def reformat(issue_data):
                     resolution_event["ref_target"] = ""
                     issue["eventsList"].append(resolution_event)
 
-                    # the added resolution is appended to the old resolution list
-                    # works because label events are sorted by time
-                    new_resolutions = list(resolution_changes[-1][1])
-                    new_resolutions.append(str(label))
-                    # creates new resolution change object
-                    resolution_changes.append([resolution_event["created_at"], new_resolutions])
-
             # %TODO: event for removed labels has to be checked. Data is missing
 
-            # if event_info_1 does not exist in the event, an empty info is created
-            if "event_info_1" not in event:
-                event["event_info_1"] = ""
-
-            # if event_info_2 does not exist in the event, an empty info is created
-            if 'event_info_2' not in event:
-                event["event_info_2"] = ""
-
-        # state and resolution change lists get sorted by time
-        state_changes.sort(key=lambda x: x[0])
-        resolution_changes.sort(key=lambda x: x[0])
-
-        # the format of every comment is adjusted to the event format
-        for comment in issue["commentsList"]:
-            comment["event"] = "commented"
-            comment["ref_target"] = ""
-
-            comment["created_at"] = format_time(comment["created_at"])
-
-            # cache comment by date to resolve/re-arrange references later
-            comments[comment["created_at"]] = comment
-
-            # the state the issue had when the comment was written is searched out
-            for state in state_changes:
-                if comment['created_at'] > state[0]:
-                    comment['event_info_1'] = state[1]
-
-            # the resolution the issue had when the comment was written is searched out
-            for resolution in resolution_changes:
-                if comment['created_at'] > resolution[0]:
-                    comment['event_info_2'] = resolution[1]
-
-        # merge events and comment lists
-        issue["eventsList"] = issue["commentsList"] + issue["eventsList"]
-
-        # remove events without user
-        issue["eventsList"] = [event for event in issue["eventsList"] if
-                               not (event["user"] is None or event["ref_target"] is None)]
-
-        # sorts eventsList by time
-        issue["eventsList"].sort(key=operator.itemgetter('created_at'))
+            elif event["event"] == "commented":
+                # "state_new" and "resolution" of the issue give the information about the state and the resolution of
+                # the issue when the comment was written, because the eventsList is sorted by time
+                event["event_info_1"] = issue["state_new"]
+                event["event_info_2"] = str(issue["resolution"])
 
     return issue_data
 
@@ -430,9 +422,10 @@ def insert_user_data(issues, conf):
 
 
 def print_to_disk(issues, results_folder):
-    """Print issues to file 'issues.list' in result folder.
+    """
+    Print issues to file 'issues.list' in result folder.
     This format is outdated but still used by the network library.
-    When the network library is updated, this method can be overwritten by 'print_to_disk_new'.
+    TODO When the network library is updated, this method can be overwritten by 'print_to_disk_new'.
 
     :param issues: the issues to dump
     :param results_folder: the folder where to place 'issues.list' output file
@@ -464,16 +457,17 @@ def print_to_disk(issues, results_folder):
 
 
 def print_to_disk_new(issues, results_folder):
-    """Print issues to file 'issues_new.list' in result folder.
+    """
+    Print issues to file 'issues_new.list' in result folder.
     This file has a consistent format to the 'bugs-jira.list' file.
-    When the network library is updated, this is the format which shall be used.
+    TODO When the network library is updated, this is the format which shall be used.
 
     :param issues: the issues to dump
     :param results_folder: the folder where to place 'issues.list' output file
     """
 
     # construct path to output file
-    output_file = os.path.join(results_folder, "issues_new.list")
+    output_file = os.path.join(results_folder, "new_format.list")
     log.info("Dumping output in file '{}'...".format(output_file))
 
     # construct lines of output
