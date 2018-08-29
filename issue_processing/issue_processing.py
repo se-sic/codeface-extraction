@@ -113,8 +113,28 @@ def format_time(time):
     :return: the formatted time
     """
 
-    d = dateparser.parse(time)
-    return d.strftime("%Y-%m-%d %H:%M:%S")
+    # empty time would be formatted to current date
+    if time != "":
+        d = dateparser.parse(time)
+        time = d.strftime("%Y-%m-%d %H:%M:%S")
+    return time
+
+
+def create_user(name, username, email):
+    """
+    Creates an user object with all needed information
+    :param name: the name the user shall have
+    :param username: the username the user shall have
+    :param email:  the email the user shall have
+    :return: the created user object
+    """
+
+    user = dict()
+    user["name"] = name
+    user["username"] = username
+    user["email"] = email
+
+    return user
 
 
 def reformat_issues(issue_data):
@@ -136,19 +156,19 @@ def reformat_issues(issue_data):
         # empty container for issue resolutions
         issue["resolution"] = []
 
-        # if an issue has no eventsList an empty Lists gets created
+        # if an issue has no eventsList, an empty List gets created
         if issue["eventsList"] is None:
             issue["eventsList"] = []
 
-        # if an issue has no commentsList an empty Lists gets created
+        # if an issue has no commentsList, an empty List gets created
         if issue["commentsList"] is None:
             issue["commentsList"] = []
 
-        # if an issue has no relatedCommits an empty Lists gets created
+        # if an issue has no relatedCommits, an empty List gets created
         if issue["relatedCommits"] is None:
             issue["relatedCommits"] = []
 
-        # if an issue has no relatedIssues an empty Lists gets created
+        # if an issue has no relatedIssues, an empty List gets created
         if "relatedIssues" not in issue:
             issue["relatedIssues"] = []
 
@@ -200,11 +220,7 @@ def merge_issue_events(issue_data):
         # GH-Wrapper doesn't provide information about time and user yet. Has to be updated if this changes
         for rel_issue in issue["relatedIssues"]:
             link_event = dict()
-            author = dict()
-            author["username"] = ""
-            author["name"] = ""
-            author["email"] = ""
-            link_event["user"] = author
+            link_event["user"] = create_user("", "", "")
             link_event["created_at"] = ""
             link_event["event"] = "add_link"
             link_event["event_info_1"] = rel_issue
@@ -224,11 +240,7 @@ def merge_issue_events(issue_data):
             # old gh-wrapper data has just a unicode string as an author. new gh-wrapper data has an author object
             # for old data an author object is created
             if isinstance(rel_commit["author"], unicode):
-                author = dict()
-                author["username"] = rel_commit["author"]
-                author["name"] = rel_commit["author"]
-                author["email"] = ""
-                link_event["user"] = author
+                link_event["user"] = create_user(rel_commit["author"], rel_commit["author"], "")
             else:
                 link_event["user"] = rel_commit["author"]
 
@@ -316,7 +328,7 @@ def reformat_events(issue_data):
 
                     # creates an event for type updates and adds it to the eventsList
                     type_event = dict()
-                    type_event["user"] = issue["user"]
+                    type_event["user"] = event["user"]
                     type_event["created_at"] = event["created_at"]
                     type_event["event"] = "type_updated"
                     type_event["event_info_1"] = label
@@ -330,7 +342,7 @@ def reformat_events(issue_data):
 
                     # creates an event for resolution updates and adds it to the eventsList
                     resolution_event = dict()
-                    resolution_event["user"] = issue["user"]
+                    resolution_event["user"] = event["user"]
                     resolution_event["created_at"] = event["created_at"]
                     resolution_event["event"] = "resolution_updated"
                     resolution_event["event_info_1"] = label
@@ -412,6 +424,7 @@ def insert_user_data(issues, conf):
         for event in issue["eventsList"]:
             # get the event user from the DB
             event["user"] = get_or_update_user(event["user"])
+
             # get the reference-target user from the DB if needed
             if event["ref_target"] != "":
                 event["ref_target"] = get_or_update_user(event["ref_target"])

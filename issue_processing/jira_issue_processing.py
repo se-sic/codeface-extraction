@@ -29,6 +29,7 @@ import csv
 
 from xml.dom.minidom import parse
 from datetime import datetime
+from dateutil import parser as dateparser
 
 from codeface.cli import log
 from codeface.cluster.idManager import idManager
@@ -118,6 +119,38 @@ def load_xml(source_folder):
     return issue_data
 
 
+def format_time(time):
+    """
+    Format times from different sources to a consistent time format
+
+    :param time: the time that shall be formatted
+    :return: the formatted time
+    """
+
+    # empty time would be formatted to current date
+    if time != "":
+        d = dateparser.parse(time)
+        time = d.strftime("%Y-%m-%d %H:%M:%S")
+    return time
+
+
+def create_user(name, username, email):
+    """
+    Creates an user object with all needed information
+    :param name: the name the user shall have
+    :param username: the username the user shall have
+    :param email:  the email the user shall have
+    :return: the created user object
+    """
+
+    user = dict()
+    user["name"] = name
+    user["username"] = username
+    user["email"] = email
+
+    return user
+
+
 def merge_user_with_user_from_csv(user, persons):
     """merges list of given users with list of already known users
 
@@ -168,15 +201,13 @@ def parse_xml(issue_data, persons, skip_history):
 
             created = issue_x.getElementsByTagName('created')[0]
             createDate = created.firstChild.data
-            d = datetime.strptime(createDate, '%a, %d %b %Y %H:%M:%S +0000')
-            issue['creationDate'] = d.strftime('%Y-%m-%d %H:%M:%S')
+            issue['creationDate'] = format_time(createDate)
 
             resolved = issue_x.getElementsByTagName('resolved')
             issue['resolveDate'] = ""
             if (len(resolved) > 0) and (not resolved[0] is None):
                 resolveDate = resolved[0].firstChild.data
-                d = datetime.strptime(resolveDate, '%a, %d %b %Y %H:%M:%S +0000')
-                issue['resolveDate'] = d.strftime('%Y-%m-%d %H:%M:%S')
+                issue['resolveDate'] = format_time(resolveDate)
 
             title = issue_x.getElementsByTagName('title')[0]
             issue['title'] = title.firstChild.data
@@ -186,12 +217,12 @@ def parse_xml(issue_data, persons, skip_history):
 
             type = issue_x.getElementsByTagName('type')[0]
             issue['type'] = type.firstChild.data
-            # new consistent format with GitHub issues. Not supported by the network library yet
+            # TODO new consistent format with GitHub issues. Not supported by the network library yet
             issue['type_new'] = ['issue', str(type.firstChild.data.lower())]
 
             status = issue_x.getElementsByTagName('status')[0]
             issue['state'] = status.firstChild.data
-            # new consistent format with GitHub issues. Not supported by the network library yet
+            # TODO new consistent format with GitHub issues. Not supported by the network library yet
             issue['state_new'] = status.firstChild.data.lower()
 
             project = issue_x.getElementsByTagName('project')[0]
@@ -220,9 +251,7 @@ def parse_xml(issue_data, persons, skip_history):
                 for ref in issue_x.getElementsByTagName('issuelinktype'):
                     history = dict()
                     history['event'] = 'add_link'
-                    history["author"] = dict()
-                    history["author"]["name"] = ''
-                    history["author"]["email"] = ''
+                    history['author'] = create_user('', '', '')
                     history['date'] = ''
                     history['event_info_1'] = ref.getElementsByTagName('issuekey')[0].firstChild.data
                     history['event_info_2'] = "issue"
@@ -230,11 +259,8 @@ def parse_xml(issue_data, persons, skip_history):
                     issue['history'].append(history)
 
             reporter = issue_x.getElementsByTagName('reporter')[0]
-            user = dict()
-            user["username"] = reporter.attributes['username'].value
-            user["name"] = reporter.firstChild.data
-            user["email"] = ""
-            issue["author"] = merge_user_with_user_from_csv(user, persons)
+            user = create_user(reporter.firstChild.data, reporter.attributes['username'].value, '')
+            issue['author'] = merge_user_with_user_from_csv(user, persons)
 
             issue['title'] = issue_x.getElementsByTagName('title')[0].firstChild.data
 
@@ -242,17 +268,13 @@ def parse_xml(issue_data, persons, skip_history):
             for comment_x in issue_x.getElementsByTagName('comment'):
                 comment = dict()
                 comment['id'] = comment_x.attributes['id'].value
-                user = dict()
-                user["username"] = comment_x.attributes['author'].value
-                user["name"] = ""
-                user["email"] = ""
-                comment["author"] = merge_user_with_user_from_csv(user, persons)
+                user = create_user('', comment_x.attributes['author'].value, '')
+                comment['author'] = merge_user_with_user_from_csv(user, persons)
                 comment['state_on_creation'] = issue['state']  # can get updated if history is retrieved
                 comment['resolution_on_creation'] = issue['resolution']  # can get updated if history is retrieved
 
                 created = comment_x.attributes['created'].value
-                d = datetime.strptime(created, '%a, %d %b %Y %H:%M:%S +0000')
-                comment['changeDate'] = d.strftime('%Y-%m-%d %H:%M:%S')
+                comment['changeDate'] = format_time(created)
 
                 comment['text'] = comment_x.firstChild.data
                 comment['issueId'] = issue['id']
@@ -266,7 +288,7 @@ def parse_xml(issue_data, persons, skip_history):
                 relation = dict()
                 relation['relation'] = rel.getElementsByTagName('name')[0].firstChild.data
 
-                if (rel.hasAttribute('inwardlinks')):
+                if rel.hasAttribute('inwardlinks'):
                     left = rel.getElementsByTagName('inwardlinks')
                     issuekeys = left.getElementsByTagName("issuekey")
                     for key in issuekeys:
@@ -274,7 +296,7 @@ def parse_xml(issue_data, persons, skip_history):
                         relation['id'] = key.firstChild.data
                         relations.append(relation)
 
-                if (rel.hasAttribute('outwardlinks')):
+                if rel.hasAttribute('outwardlinks'):
                     right = rel.getElementsByTagName('outwardlinks')
                     issuekeys = right.getElementsByTagName('issuekey')
                     for key in issuekeys:
@@ -282,7 +304,7 @@ def parse_xml(issue_data, persons, skip_history):
                         relation['id'] = key.firstChild.data
                         relations.append(relation)
 
-            issue["relations"] = relations
+            issue['relations'] = relations
             issues.append(issue)
     log.debug("number of issues after parse_xml: '{}'".format(len(issues)))
     return issues
@@ -300,16 +322,6 @@ def load_issue_via_api(issues, persons, url):
     jira_project = JIRA(url)
 
     for issue in issues:
-
-        def format_time(time):
-            """The time from the API is formatted to the consistent format
-
-                    :param time to be formatted
-                    :return the formatted time
-                """
-
-            d = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f+0000")
-            return d.strftime('%Y-%m-%d %H:%M:%S')
 
         api_issue = jira_project.issue(issue['externalId'], expand='changelog')
         changelog = api_issue.changelog
@@ -342,11 +354,8 @@ def load_issue_via_api(issues, persons, url):
                     history['event'] = 'state_updated'
                     history['event_info_1'] = new_state
                     history['event_info_2'] = old_state
-                    user = dict()
-                    user["username"] = change.author.name
-                    user["name"] = change.author.name
-                    user["email"] = ""
-                    history["author"] = merge_user_with_user_from_csv(user, persons)
+                    user = create_user(change.author.name, change.author.name, "")
+                    history['author'] = merge_user_with_user_from_csv(user, persons)
                     history['date'] = format_time(change.created)
                     histories.append(history)
                     state_changes.append([history['date'], new_state])
@@ -361,11 +370,8 @@ def load_issue_via_api(issues, persons, url):
                     history['event'] = 'resolution_updated'
                     history['event_info_1'] = new_resolution
                     history['event_info_2'] = old_resolution
-                    user = dict()
-                    user["username"] = change.author.name
-                    user["name"] = change.author.name
-                    user["email"] = ""
-                    history["author"] = merge_user_with_user_from_csv(user, persons)
+                    user = create_user(change.author.name, change.author.name, "")
+                    history['author'] = merge_user_with_user_from_csv(user, persons)
                     history['date'] = format_time(change.created)
                     histories.append(history)
                     resolution_changes.append([history['date'], new_resolution])
@@ -374,15 +380,9 @@ def load_issue_via_api(issues, persons, url):
                 elif item.field == 'assignee':
                     history = dict()
                     history['event'] = 'assigned'
-                    user = dict()
-                    user["username"] = change.author.name
-                    user["name"] = change.author.name
-                    user["email"] = ""
-                    history["author"] = merge_user_with_user_from_csv(user, persons)
-                    assignee = dict()
-                    assignee["username"] = str(item.toString)
-                    assignee["name"] = str(item.toString)
-                    assignee["email"] = ""
+                    user = create_user(change.author.name, change.author.name, "")
+                    history['author'] = merge_user_with_user_from_csv(user, persons)
+                    assignee = create_user(item.toString, item.toString, "")
                     assigned_user = merge_user_with_user_from_csv(assignee, persons)
                     history['event_info_1'] = assigned_user['name']
                     history['event_info_2'] = assigned_user['email']
@@ -394,11 +394,8 @@ def load_issue_via_api(issues, persons, url):
                     if item.toString is not None:
                         history = dict()
                         history['event'] = 'add_link'
-                        user = dict()
-                        user["username"] = change.author.name
-                        user["name"] = change.author.name
-                        user["email"] = ""
-                        history["author"] = merge_user_with_user_from_csv(user, persons)
+                        user = create_user(change.author.name, change.author.name, "")
+                        history['author'] = merge_user_with_user_from_csv(user, persons)
                         # api returns a text. The issueId is at the end of the text and gets extracted
                         history['event_info_1'] = item.toString.split()[-1]
                         history['event_info_2'] = "issue"
@@ -409,11 +406,8 @@ def load_issue_via_api(issues, persons, url):
                     if item.fromString is not None:
                         history = dict()
                         history['event'] = 'remove_link'
-                        user = dict()
-                        user["username"] = change.author.name
-                        user["name"] = change.author.name
-                        user["email"] = ""
-                        history["author"] = merge_user_with_user_from_csv(user, persons)
+                        user = create_user(change.author.name, change.author.name, "")
+                        history['author'] = merge_user_with_user_from_csv(user, persons)
                         # api returns a text. Th issue id is at the end of the text and gets extracted
                         history['event_info_1'] = item.fromString.split()[-1]
                         history['event_info_2'] = "issue"
@@ -579,7 +573,7 @@ def print_to_disk_bugs(issues, results_folder):
                 issue['author']['email'],
                 issue['creationDate'],
                 "open",  ## default state when created
-                ["unresolved"]  ## default resolution when created
+                ['unresolved']  ## default resolution when created
             ))
 
             lines.append((
@@ -599,7 +593,7 @@ def print_to_disk_bugs(issues, results_folder):
                 "unresolved"  ## default resolution when created
             ))
 
-            for comment in issue["comments"]:
+            for comment in issue['comments']:
                 lines.append((
                     issue['externalId'],
                     issue['title'],
