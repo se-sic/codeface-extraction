@@ -128,15 +128,17 @@ def format_time(time):
     """
 
     # empty time would be formatted to current date
-    if time != "":
+    if time == "" or time is None:
+        return ""
+    else:
         d = dateparser.parse(time)
-        time = d.strftime("%Y-%m-%d %H:%M:%S")
-    return time
+        return d.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def create_user(name, username, email):
     """
     Creates an user object with all needed information
+
     :param name: the name the user shall have
     :param username: the username the user shall have
     :param email:  the email the user shall have
