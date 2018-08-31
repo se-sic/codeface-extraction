@@ -218,41 +218,38 @@ def merge_issue_events(issue_data):
         issue["eventsList"].append(created_event)
         issue["state_new"] = "open"
 
-        # adds events for related issues to eventsList
-        # GH-Wrapper doesn't provide information about time and user yet. Has to be updated if this changes
+        # the format of every related issue is adjusted to the event format
         for rel_issue in issue["relatedIssues"]:
-            link_event = dict()
-            link_event["user"] = create_user("", "", "")
-            link_event["created_at"] = ""
-            link_event["event"] = "add_link"
-            link_event["event_info_1"] = rel_issue
-            link_event["event_info_2"] = "issue"
-            link_event["ref_target"] = ""
-            issue["eventsList"].append(link_event)
+            rel_issue["created_at"] = format_time(rel_issue["referenced_at"])
+            rel_issue["event"] = "add_link"
+            rel_issue["event_info_1"] = rel_issue["number"]
+            rel_issue["event_info_2"] = "issue"
+            rel_issue["ref_target"] = ""
 
-        # adds events for related commits to eventsList
+        # the format of every related commit is adjusted to the event format
         for rel_commit in issue["relatedCommits"]:
-            link_event = dict()
-            link_event["created_at"] = rel_commit["time"]
-            link_event["event"] = "add_link"
-            link_event["event_info_1"] = rel_commit["hash"]
-            link_event["event_info_2"] = "commit"
-            link_event["ref_target"] = ""
 
-            # old gh-wrapper data has just a unicode string as an author. new gh-wrapper data has an author object
-            # for old data an author object is created
-            if isinstance(rel_commit["author"], unicode):
-                link_event["user"] = create_user(rel_commit["author"], rel_commit["author"], "")
+            # if the related commit has no time, it is a commit in the pull-request
+            if rel_commit["referenced_at"] is None:
+                rel_commit["user"] = create_user("", "", "")
+                rel_commit["created_at"] = ""
+                rel_commit["event"] = "hasCommit"
+                rel_commit["event_info_1"] = rel_commit["commit_id"]
+                rel_commit["event_info_2"] = ""
+                rel_commit["ref_target"] = ""
+            # else it is a commit the issue/ pull-request refers to
             else:
-                link_event["user"] = rel_commit["author"]
-
-            issue["eventsList"].append(link_event)
+                rel_commit["created_at"] = format_time(rel_commit["referenced_at"])
+                rel_commit["event"] = "add_link"
+                rel_commit["event_info_1"] = rel_commit["commit_id"]
+                rel_commit["event_info_2"] = "commit"
+                rel_commit["ref_target"] = ""
 
         # the format of every comment is adjusted to the event format
         for comment in issue["commentsList"]:
             comment["event"] = "commented"
             comment["ref_target"] = ""
-            comment["created_at"] = format_time(comment["created_at"])
+            comment["created_at"] = format_time(comment["referenced_at"])
             if "event_info_1" not in comment:
                 comment["event_info_1"] = ""
             if "event_info_2" not in comment:
@@ -280,8 +277,9 @@ def merge_issue_events(issue_data):
                     event["ref_target"] = event["user"]
                     event["user"] = comment["user"]
 
-        # merge events and comment lists
-        issue["eventsList"] = issue["commentsList"] + issue["eventsList"]
+        # merge events, relatedCommits, relatedIssues and comment lists
+        issue["eventsList"] = issue["commentsList"] + issue["eventsList"] + issue["relatedIssues"] + issue[
+            "relatedCommits"]
 
         # remove events without user
         issue["eventsList"] = [event for event in issue["eventsList"] if
@@ -352,7 +350,37 @@ def reformat_events(issue_data):
                     resolution_event["ref_target"] = ""
                     issue["eventsList"].append(resolution_event)
 
-            # %TODO: event for removed labels has to be checked. Data is missing
+            elif event["event"] == "unlabeled":
+                label = event["label"]["name"].lower()
+                event["event_info_1"] = label
+
+                # if the label is in this list, it also is a type of the issue
+                if label in known_types:
+                    issue["type"].remove(str(label))
+
+                    # creates an event for type updates and adds it to the eventsList
+                    type_event = dict()
+                    type_event["user"] = event["user"]
+                    type_event["created_at"] = event["created_at"]
+                    type_event["event"] = "type_updated"
+                    type_event["event_info_1"] = ""
+                    type_event["event_info_2"] = label
+                    type_event["ref_target"] = ""
+                    issue["eventsList"].append(type_event)
+
+                    # if the label is in this list, it also is a resolution of the issue
+                elif label in known_resolutions:
+                    issue["resolution"].remove(str(label))
+
+                    # creates an event for resolution updates and adds it to the eventsList
+                    resolution_event = dict()
+                    resolution_event["user"] = event["user"]
+                    resolution_event["created_at"] = event["created_at"]
+                    resolution_event["event"] = "resolution_updated"
+                    resolution_event["event_info_1"] = ""
+                    resolution_event["event_info_2"] = label
+                    resolution_event["ref_target"] = ""
+                    issue["eventsList"].append(resolution_event)
 
             elif event["event"] == "commented":
                 # "state_new" and "resolution" of the issue give the information about the state and the resolution of
