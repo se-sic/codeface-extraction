@@ -240,7 +240,7 @@ def merge_issue_events(issue_data):
             if rel_commit["referenced_at"] is None:
                 rel_commit["user"] = create_user("", "", "")
                 rel_commit["created_at"] = ""
-                rel_commit["event"] = "hasCommit"
+                rel_commit["event"] = "has_commit"
                 rel_commit["event_info_1"] = rel_commit["commit_id"]
                 rel_commit["event_info_2"] = ""
                 rel_commit["ref_target"] = ""
@@ -399,7 +399,8 @@ def reformat_events(issue_data):
 
 
 def insert_user_data(issues, conf):
-    """Insert user data into database ad update issue data.
+    """
+    Insert user data into database ad update issue data.
 
     :param issues: the issues to retrieve user data from
     :param conf: the project configuration
@@ -443,9 +444,9 @@ def insert_user_data(issues, conf):
 
         # update user data with person information from DB
         person = idservice.getPersonFromDB(idx)
-        user["email"] = person["email1"]  # column 'email1'
-        user["name"] = person["name"]  # column 'name'
-        user["id"] = person["id"]  # column 'id'
+        user["email"] = person["email1"]  # column "email1"
+        user["name"] = person["name"]  # column "name"
+        user["id"] = person["id"]  # column "id"
 
         # add user information to buffer
         # user_string = get_user_string(user["name"], user["email"]) # update for
@@ -473,12 +474,12 @@ def insert_user_data(issues, conf):
 
 def print_to_disk(issues, results_folder):
     """
-    Print issues to file 'issues.list' in result folder.
+    Print issues to file "issues.list" in result folder.
     This format is outdated but still used by the network library.
-    TODO When the network library is updated, this method can be overwritten by 'print_to_disk_new'.
+    TODO When the network library is updated, this method can be overwritten by "print_to_disk_new".
 
     :param issues: the issues to dump
-    :param results_folder: the folder where to place 'issues.list' output file
+    :param results_folder: the folder where to place "issues.list" output file
     """
 
     # construct path to output file
@@ -508,12 +509,12 @@ def print_to_disk(issues, results_folder):
 
 def print_to_disk_new(issues, results_folder):
     """
-    Print issues to file 'issues_new.list' in result folder.
-    This file has a consistent format to the 'bugs-jira.list' file.
+    Print issues to file "issues_new.list" in result folder.
+    This file has a consistent format to the "bugs-jira.list" file.
     TODO When the network library is updated, this is the format which shall be used.
 
     :param issues: the issues to dump
-    :param results_folder: the folder where to place 'issues.list' output file
+    :param results_folder: the folder where to place "issues.list" output file
     """
 
     # construct path to output file
