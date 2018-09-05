@@ -131,6 +131,13 @@ def create_user(name, username, email):
     :return: the created user object
     """
 
+    if name is None:
+        name = ""
+    if username is None:
+        username = ""
+    if email is None:
+        email = ""
+
     user = dict()
     user["name"] = name
     user["username"] = username
