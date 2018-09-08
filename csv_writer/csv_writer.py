@@ -13,6 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
+# Copyright 2018 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file provides the needed functions for standardized CSV writing
