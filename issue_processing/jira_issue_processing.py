@@ -70,31 +70,63 @@ def run():
     # get person folder
     # __psrcdir = os.path.abspath(os.path.join(args.resdir, __conf["repo"] + "_proximity", "conway"))
 
-    # 1) load the list of issues
-    issues = load_xml(__srcdir)
-    # 1b) load the list of persons
+    # load the list of persons
     persons = load_csv(__srcdir_csv)
-    # 2) re-format the issues
-    issues = parse_xml(issues, persons, args.skip_history)
-    # 3) load issue information via api
-    if not args.skip_history:
-        load_issue_via_api(issues, persons, __conf["issueTrackerURL"])
-    # 4) update user data with Codeface database
-    # mabye not nessecary
-    issues = insert_user_data(issues, __conf)
-    # 5) dump result to disk
-    print_to_disk(issues, __resdir)
-    # 6) export for Gephi
-    print_to_disk_gephi(issues, __resdir)
-    # 7) export for jira issue extraction to use them in dev-network-growth
-    print_to_disk_extr(issues, __resdir)
-    # 8) dump bug issues to disk
-    print_to_disk_bugs(issues, __resdir)
+
+    # load the xml-file list
+    file_list = [f for f in os.listdir(__srcdir) if os.path.isfile(os.path.join(__srcdir, f))]
+
+    # creates empty result files
+    clear_result_files(__resdir)
+
+    # processes every xml-file
+    for file in file_list:
+        # 1) load the list of issues
+        issues = load_xml(__srcdir, file)
+        # 2) re-format the issues
+        issues = parse_xml(issues, persons, args.skip_history)
+        # 3) load issue information via api
+        if not args.skip_history:
+            load_issue_via_api(issues, persons, __conf["issueTrackerURL"])
+        # 4) update user data with Codeface database
+        # mabye not nessecary
+        issues = insert_user_data(issues, __conf)
+        # 5) dump result to disk
+        print_to_disk(issues, __resdir)
+        # 6) export for Gephi
+        print_to_disk_gephi(issues, __resdir)
+        # 7) export for jira issue extraction to use them in dev-network-growth
+        print_to_disk_extr(issues, __resdir)
+        # 8) dump bug issues to disk
+        print_to_disk_bugs(issues, __resdir)
 
     log.info("Jira issue processing complete!")
 
 
-def load_xml(source_folder):
+def clear_result_files(results_folder):
+    """
+    Creates an empty csv file for every result file.
+    :param results_folder: the folder where to save the result files
+    """
+
+    log.info("Clear result files ...")
+
+    # construct path to output files
+    output_file = os.path.join(results_folder, "issues-jira.list")
+    output_file_bugs = os.path.join(results_folder, "bugs-jira.list")
+    output_file_extr = os.path.join(results_folder, "issue-jiras.list")
+    output_file_gephi_edges = os.path.join(results_folder, "issues-jira-gephi-edges.csv")
+    output_file_gephi_nodes = os.path.join(results_folder, "issues-jira-gephi-nodes.csv")
+
+    # creates empty csv files
+    csv_writer.write_to_csv(output_file, [])
+    csv_writer.write_to_csv(output_file_bugs, [])
+    csv_writer.write_to_csv(output_file_extr, [])
+    csv_writer.write_to_csv(output_file_gephi_edges, [])
+    csv_writer.write_to_csv(output_file_gephi_nodes, [])
+
+
+def load_xml(source_folder, file):
     """
     Load issues from disk.
 
@@ -102,20 +134,18 @@ def load_xml(source_folder):
     :return: the loaded issue data
     """
 
-    filelist = [f for f in os.listdir(source_folder) if os.path.isfile(os.path.join(source_folder, f))]
     issue_data = list()
-    for file in filelist:
-        srcfile = os.path.join(source_folder, file)
-        log.devinfo("Loading issues from file '{}'...".format(srcfile))
+    srcfile = os.path.join(source_folder, file)
+    log.devinfo("Loading issues from file '{}'...".format(srcfile))
 
-        # check if file exists and exit early if not
-        if not os.path.exists(srcfile):
-            log.info("Issue file '{}' does not exist! Exiting early...".format(srcfile))
-            sys.exit(-1)
+    # check if file exists and exit early if not
+    if not os.path.exists(srcfile):
+        log.info("Issue file '{}' does not exist! Exiting early...".format(srcfile))
+        sys.exit(-1)
 
-        # with open(srcfile, "r") as issues_file:
-        xmldoc = parse(srcfile)
-        issue_data.append(xmldoc)
+    # with open(srcfile, "r") as issues_file:
+    xmldoc = parse(srcfile)
+    issue_data.append(xmldoc)
 
     return issue_data
 
@@ -549,8 +579,9 @@ def print_to_disk(issues, results_folder):
                 issue["externalId"],
                 "comment"
             ))
+
     # write to output file
-    csv_writer.write_to_csv(output_file, lines)
+    csv_writer.write_to_csv(output_file, lines, True)
 
 
 def print_to_disk_bugs(issues, results_folder):
@@ -645,7 +676,7 @@ def print_to_disk_bugs(issues, results_folder):
                 ))
 
     # write to output file
-    csv_writer.write_to_csv(output_file, lines)
+    csv_writer.write_to_csv(output_file, lines, True)
 
 
 def print_to_disk_extr(issues, results_folder):
@@ -705,7 +736,7 @@ def print_to_disk_extr(issues, results_folder):
                 "commented"  ## event.name
             ))
     # write to output file
-    csv_writer.write_to_csv(output_file, lines)
+    csv_writer.write_to_csv(output_file, lines, True)
 
 
 def print_to_disk_gephi(issues, results_folder):
@@ -743,8 +774,8 @@ def print_to_disk_gephi(issues, results_folder):
             edge_lines.append((comment["author"]["name"], comment["id"], ["changeDate"],
                                "Person-Comment"))
     # write to output file
-    csv_writer.write_to_csv(output_file_edges, edge_lines)
-    csv_writer.write_to_csv(output_file_nodes, node_lines)
+    csv_writer.write_to_csv(output_file_edges, edge_lines, True)
+    csv_writer.write_to_csv(output_file_nodes, node_lines, True)
 
 
 def load_csv(source_folder):

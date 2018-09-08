@@ -34,13 +34,28 @@ def __encode(line):
     return lineres
 
 
-def write_to_csv(file_path, lines):
-    """Write the given lines to the file with the given file path."""
+def write_to_csv(file_path, lines, append=False):
+    """
+    Write the given lines to the file with the given file path.
+    :param file_path: The path where the file shall be written
+    :param lines: The lines that shall be written in the file
+    :param append: Flag if lines shall be appended to file or overwrite file
+    """
 
-    # write lines to file for current kind of artifact
-    with open(file_path, 'wb') as csv_file:
-        wr = csv.writer(csv_file, delimiter=';', lineterminator='\n', quoting=csv.QUOTE_NONNUMERIC)
-        # encode in proper UTF-8 before writing to file
-        for line in lines:
-            line_encoded = __encode(line)
-            wr.writerow(line_encoded)
+    if append:
+        # append lines to file for current kind of artifact
+        with open(file_path, 'a') as csv_file:
+            wr = csv.writer(csv_file, delimiter=';', lineterminator='\n', quoting=csv.QUOTE_NONNUMERIC)
+            # encode in proper UTF-8 before writing to file
+            for line in lines:
+                line_encoded = __encode(line)
+                wr.writerow(line_encoded)
+
+    else:
+        # write lines to file for current kind of artifact
+        with open(file_path, 'wb') as csv_file:
+            wr = csv.writer(csv_file, delimiter=';', lineterminator='\n', quoting=csv.QUOTE_NONNUMERIC)
+            # encode in proper UTF-8 before writing to file
+            for line in lines:
+                line_encoded = __encode(line)
+                wr.writerow(line_encoded)
