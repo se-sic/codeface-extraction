@@ -605,7 +605,7 @@ def print_to_disk_bugs(issues, results_folder):
                 issue["author"]["email"],
                 issue["creationDate"],
                 "open",  ##  default state when created
-                "unresolved"  ## default resolution when created
+                ["unresolved"]  ## default resolution when created
             ))
 
             for comment in issue["comments"]:
