@@ -13,6 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
+# Copyright 2018 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file provides the needed functions for standardized CSV writing
@@ -34,11 +35,18 @@ def __encode(line):
     return lineres
 
 
-def write_to_csv(file_path, lines):
-    """Write the given lines to the file with the given file path."""
+def write_to_csv(file_path, lines, append=False):
+    """
+    Write the given lines to the file with the given file path.
 
-    # write lines to file for current kind of artifact
-    with open(file_path, 'wb') as csv_file:
+    :param file_path: The path where the file shall be written
+    :param lines: The lines that shall be written in the file
+    :param append: Flag if lines shall be appended to file or overwrite file
+    """
+
+    open_mode = "a+b" if append else "wb"
+
+    with open(file_path, open_mode) as csv_file:
         wr = csv.writer(csv_file, delimiter=';', lineterminator='\n', quoting=csv.QUOTE_NONNUMERIC)
         # encode in proper UTF-8 before writing to file
         for line in lines:

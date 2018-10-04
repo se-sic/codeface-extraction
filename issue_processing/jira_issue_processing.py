@@ -70,54 +70,88 @@ def run():
     # get person folder
     # __psrcdir = os.path.abspath(os.path.join(args.resdir, __conf["repo"] + "_proximity", "conway"))
 
-    # 1) load the list of issues
-    issues = load_xml(__srcdir)
-    # 1b) load the list of persons
+    # load the list of persons
     persons = load_csv(__srcdir_csv)
-    # 2) re-format the issues
-    issues = parse_xml(issues, persons, args.skip_history)
-    # 3) load issue information via api
-    if not args.skip_history:
-        load_issue_via_api(issues, persons, __conf["issueTrackerURL"])
-    # 4) update user data with Codeface database
-    # mabye not nessecary
-    issues = insert_user_data(issues, __conf)
-    # 5) dump result to disk
-    print_to_disk(issues, __resdir)
-    # 6) export for Gephi
-    print_to_disk_gephi(issues, __resdir)
-    # 7) export for jira issue extraction to use them in dev-network-growth
-    print_to_disk_extr(issues, __resdir)
-    # 8) dump bug issues to disk
-    print_to_disk_bugs(issues, __resdir)
+
+    # load the xml-file list
+    file_list = [f for f in os.listdir(__srcdir) if os.path.isfile(os.path.join(__srcdir, f))]
+
+    # creates empty result files
+    clear_result_files(__resdir)
+
+    # list for malformed or missing xml-files
+    incorrect_files = []
+
+    # processes every xml-file
+    for current_file in file_list:
+        # 1) load the list of issues
+        issues = load_xml(__srcdir, current_file)
+        # if an error occurred while loading the xml-file
+        if issues is None:
+            incorrect_files.append(current_file)
+            continue
+        # 2) re-format the issues
+        issues = parse_xml(issues, persons, args.skip_history)
+        # 3) load issue information via api
+        if not args.skip_history:
+            load_issue_via_api(issues, persons, __conf["issueTrackerURL"])
+        # 4) update user data with Codeface database
+        # mabye not nessecary
+        issues = insert_user_data(issues, __conf)
+        # 5) dump result to disk
+        print_to_disk(issues, __resdir)
+        # 6) export for Gephi
+        print_to_disk_gephi(issues, __resdir)
+        # 7) export for jira issue extraction to use them in dev-network-growth
+        print_to_disk_extr(issues, __resdir)
+        # 8) dump bug issues to disk
+        print_to_disk_bugs(issues, __resdir)
 
     log.info("Jira issue processing complete!")
 
+    if incorrect_files:
+        log.info("Following files where malformed or not existing:: " + str(incorrect_files))
 
-def load_xml(source_folder):
+
+def clear_result_files(results_folder):
+    """
+    Creates an empty csv file for every result file.
+
+    :param results_folder: the folder where to save the result files
+    """
+
+    log.info("Clear result files ...")
+
+    # construct list of path to output files
+    output_files = [os.path.join(results_folder, "issues-jira.list"), os.path.join(results_folder, "bugs-jira.list"),
+                    os.path.join(results_folder, "issue-jira.list"),
+                    os.path.join(results_folder, "issues-jira-gephi-edges.csv"),
+                    os.path.join(results_folder, "issues-jira-gephi-nodes.csv")]
+
+    # creates empty csv files
+    for output_file in output_files:
+        open(output_file, "w+").close()
+
+
+def load_xml(source_folder, xml_file):
     """
     Load issues from disk.
 
-    :param source_folder: the folder where to find .xml-files
+    :param source_folder: the folder where to .xml-file is in
+    :param xml_file: the given xml-file
     :return: the loaded issue data
     """
 
-    filelist = [f for f in os.listdir(source_folder) if os.path.isfile(os.path.join(source_folder, f))]
-    issue_data = list()
-    for file in filelist:
-        srcfile = os.path.join(source_folder, file)
-        log.devinfo("Loading issues from file '{}'...".format(srcfile))
+    srcfile = os.path.join(source_folder, xml_file)
+    log.devinfo("Loading issues from file '{}'...".format(srcfile))
 
-        # check if file exists and exit early if not
-        if not os.path.exists(srcfile):
-            log.info("Issue file '{}' does not exist! Exiting early...".format(srcfile))
-            sys.exit(-1)
-
-        # with open(srcfile, "r") as issues_file:
-        xmldoc = parse(srcfile)
-        issue_data.append(xmldoc)
-
-    return issue_data
+    try:
+        # parse the xml-file
+        issue_data = parse(srcfile)
+        return issue_data
+    except Exception as e:
+        log.info("Issue file " + format(srcfile) + " couldn't be opened because of a " + e.__class__.__name__)
+        return None
 
 
 def format_time(time):
@@ -194,130 +228,128 @@ def parse_xml(issue_data, persons, skip_history):
 
     log.info("Parse jira issues...")
     issues = list()
-    log.debug("Number of files:" + str(len(issue_data)))
-    for issue_file in issue_data:
-        issuelist = issue_file.getElementsByTagName("item")
-        # re-process all issues
-        log.debug("Number of issues:" + str(len(issuelist)))
-        for issue_x in issuelist:
-            # temporary container for references
-            comments = list()
-            issue = dict()
-            components = []
+    issuelist = issue_data.getElementsByTagName("item")
+    # re-process all issues
+    log.debug("Number of issues:" + str(len(issuelist)))
+    for issue_x in issuelist:
+        # temporary container for references
+        comments = list()
+        issue = dict()
+        components = []
 
-            # parse values form xml
-            # add issue values to the issue
-            key = issue_x.getElementsByTagName("key")[0]
-            issue["id"] = key.attributes["id"].value
-            issue["externalId"] = key.firstChild.data
+        # parse values form xml
+        # add issue values to the issue
+        key = issue_x.getElementsByTagName("key")[0]
+        issue["id"] = key.attributes["id"].value
+        issue["externalId"] = key.firstChild.data
 
-            created = issue_x.getElementsByTagName("created")[0]
-            createDate = created.firstChild.data
-            issue["creationDate"] = format_time(createDate)
+        created = issue_x.getElementsByTagName("created")[0]
+        createDate = created.firstChild.data
+        issue["creationDate"] = format_time(createDate)
 
-            resolved = issue_x.getElementsByTagName("resolved")
-            issue["resolveDate"] = ""
-            if (len(resolved) > 0) and (not resolved[0] is None):
-                resolveDate = resolved[0].firstChild.data
-                issue["resolveDate"] = format_time(resolveDate)
+        resolved = issue_x.getElementsByTagName("resolved")
+        issue["resolveDate"] = ""
+        if (len(resolved) > 0) and (not resolved[0] is None):
+            resolveDate = resolved[0].firstChild.data
+            issue["resolveDate"] = format_time(resolveDate)
 
-            title = issue_x.getElementsByTagName("title")[0]
-            issue["title"] = title.firstChild.data
+        title = issue_x.getElementsByTagName("title")[0]
+        issue["title"] = title.firstChild.data
 
-            link = issue_x.getElementsByTagName("link")[0]
-            issue["url"] = link.firstChild.data
+        link = issue_x.getElementsByTagName("link")[0]
+        issue["url"] = link.firstChild.data
 
-            type = issue_x.getElementsByTagName("type")[0]
-            issue["type"] = type.firstChild.data
-            # TODO new consistent format with GitHub issues. Not supported by the network library yet
-            issue["type_new"] = ["issue", str(type.firstChild.data.lower())]
+        type = issue_x.getElementsByTagName("type")[0]
+        issue["type"] = type.firstChild.data
+        # TODO new consistent format with GitHub issues. Not supported by the network library yet
+        issue["type_new"] = ["issue", str(type.firstChild.data.lower())]
 
-            status = issue_x.getElementsByTagName("status")[0]
-            issue["state"] = status.firstChild.data
-            # TODO new consistent format with GitHub issues. Not supported by the network library yet
-            issue["state_new"] = status.firstChild.data.lower()
+        status = issue_x.getElementsByTagName("status")[0]
+        issue["state"] = status.firstChild.data
+        # TODO new consistent format with GitHub issues. Not supported by the network library yet
+        issue["state_new"] = status.firstChild.data.lower()
 
-            project = issue_x.getElementsByTagName("project")[0]
-            issue["projectId"] = project.attributes["id"].value
+        project = issue_x.getElementsByTagName("project")[0]
+        issue["projectId"] = project.attributes["id"].value
 
-            resolution = issue_x.getElementsByTagName("resolution")[0]
-            issue["resolution"] = resolution.firstChild.data
-            # new consistent format with GitHub issues. Not supported by the network library yet
-            issue["resolution_new"] = [str(resolution.firstChild.data.lower())]
+        resolution = issue_x.getElementsByTagName("resolution")[0]
+        issue["resolution"] = resolution.firstChild.data
+        # new consistent format with GitHub issues. Not supported by the network library yet
+        issue["resolution_new"] = [str(resolution.firstChild.data.lower())]
 
-            # consistency to default GitHub labels
-            if issue["resolution"] == "Won't Fix":
-                issue["resolution_new"] = ["wontfix"]
+        # consistency to default GitHub labels
+        if issue["resolution"] == "Won't Fix":
+            issue["resolution_new"] = ["wontfix"]
 
-            # consistency to default GitHub labels
-            if issue["resolution"] == "Won't Do":
-                issue["resolution_new"] = ["wontdo"]
+        # consistency to default GitHub labels
+        if issue["resolution"] == "Won't Do":
+            issue["resolution_new"] = ["wontdo"]
 
-            for component in issue_x.getElementsByTagName("component"):
-                components.append(str(component.firstChild.data))
-            issue["components"] = components
+        for component in issue_x.getElementsByTagName("component"):
+            components.append(str(component.firstChild.data))
+        issue["components"] = components
 
-            # if links are not loaded via api, they are added as a history event with less information
-            if skip_history:
-                issue["history"] = []
-                for ref in issue_x.getElementsByTagName("issuelinktype"):
-                    history = dict()
-                    history["event"] = "add_link"
-                    history["author"] = create_user("", "", "")
-                    history["date"] = ""
-                    history["event_info_1"] = ref.getElementsByTagName("issuekey")[0].firstChild.data
-                    history["event_info_2"] = "issue"
+        # if links are not loaded via api, they are added as a history event with less information
+        if skip_history:
+            issue["history"] = []
+            for ref in issue_x.getElementsByTagName("issuelinktype"):
+                history = dict()
+                history["event"] = "add_link"
+                history["author"] = create_user("", "", "")
+                history["date"] = ""
+                history["event_info_1"] = ref.getElementsByTagName("issuekey")[0].firstChild.data
+                history["event_info_2"] = "issue"
 
-                    issue["history"].append(history)
+                issue["history"].append(history)
 
-            reporter = issue_x.getElementsByTagName("reporter")[0]
-            user = create_user(reporter.firstChild.data, reporter.attributes["username"].value, "")
-            issue["author"] = merge_user_with_user_from_csv(user, persons)
+        reporter = issue_x.getElementsByTagName("reporter")[0]
+        user = create_user(reporter.firstChild.data, reporter.attributes["username"].value, "")
+        issue["author"] = merge_user_with_user_from_csv(user, persons)
 
-            issue["title"] = issue_x.getElementsByTagName("title")[0].firstChild.data
+        issue["title"] = issue_x.getElementsByTagName("title")[0].firstChild.data
 
-            # add comments / issue_changes to the issue
-            for comment_x in issue_x.getElementsByTagName("comment"):
-                comment = dict()
-                comment["id"] = comment_x.attributes["id"].value
-                user = create_user("", comment_x.attributes["author"].value, "")
-                comment["author"] = merge_user_with_user_from_csv(user, persons)
-                comment["state_on_creation"] = issue["state"]  # can get updated if history is retrieved
-                comment["resolution_on_creation"] = issue["resolution"]  # can get updated if history is retrieved
+        # add comments / issue_changes to the issue
+        for comment_x in issue_x.getElementsByTagName("comment"):
+            comment = dict()
+            comment["id"] = comment_x.attributes["id"].value
+            user = create_user("", comment_x.attributes["author"].value, "")
+            comment["author"] = merge_user_with_user_from_csv(user, persons)
+            comment["state_on_creation"] = issue["state"]  # can get updated if history is retrieved
+            comment["resolution_on_creation"] = issue["resolution"]  # can get updated if history is retrieved
 
-                created = comment_x.attributes["created"].value
-                comment["changeDate"] = format_time(created)
+            created = comment_x.attributes["created"].value
+            comment["changeDate"] = format_time(created)
 
-                comment["text"] = comment_x.firstChild.data
-                comment["issueId"] = issue["id"]
-                comments.append(comment)
+            comment["text"] = comment_x.firstChild.data
+            comment["issueId"] = issue["id"]
+            comments.append(comment)
 
-            issue["comments"] = comments
+        issue["comments"] = comments
 
-            # add relations to the issue
-            relations = list()
-            for rel in issue_x.getElementsByTagName("issuelinktype"):
-                relation = dict()
-                relation["relation"] = rel.getElementsByTagName("name")[0].firstChild.data
+        # add relations to the issue
+        relations = list()
+        for rel in issue_x.getElementsByTagName("issuelinktype"):
+            relation = dict()
+            relation["relation"] = rel.getElementsByTagName("name")[0].firstChild.data
 
-                if rel.hasAttribute("inwardlinks"):
-                    left = rel.getElementsByTagName("inwardlinks")
-                    issuekeys = left.getElementsByTagName("issuekey")
-                    for key in issuekeys:
-                        relation["type"] = "inward"
-                        relation["id"] = key.firstChild.data
-                        relations.append(relation)
+            if rel.hasAttribute("inwardlinks"):
+                left = rel.getElementsByTagName("inwardlinks")
+                issuekeys = left.getElementsByTagName("issuekey")
+                for key in issuekeys:
+                    relation["type"] = "inward"
+                    relation["id"] = key.firstChild.data
+                    relations.append(relation)
 
-                if rel.hasAttribute("outwardlinks"):
-                    right = rel.getElementsByTagName("outwardlinks")
-                    issuekeys = right.getElementsByTagName("issuekey")
-                    for key in issuekeys:
-                        relation["type"] = "outward"
-                        relation["id"] = key.firstChild.data
-                        relations.append(relation)
+            if rel.hasAttribute("outwardlinks"):
+                right = rel.getElementsByTagName("outwardlinks")
+                issuekeys = right.getElementsByTagName("issuekey")
+                for key in issuekeys:
+                    relation["type"] = "outward"
+                    relation["id"] = key.firstChild.data
+                    relations.append(relation)
 
-            issue["relations"] = relations
-            issues.append(issue)
+        issue["relations"] = relations
+        issues.append(issue)
     log.debug("number of issues after parse_xml: '{}'".format(len(issues)))
     return issues
 
@@ -549,8 +581,9 @@ def print_to_disk(issues, results_folder):
                 issue["externalId"],
                 "comment"
             ))
+
     # write to output file
-    csv_writer.write_to_csv(output_file, lines)
+    csv_writer.write_to_csv(output_file, lines, append=True)
 
 
 def print_to_disk_bugs(issues, results_folder):
@@ -605,7 +638,7 @@ def print_to_disk_bugs(issues, results_folder):
                 issue["author"]["email"],
                 issue["creationDate"],
                 "open",  ##  default state when created
-                "unresolved"  ## default resolution when created
+                ["unresolved"]  ## default resolution when created
             ))
 
             for comment in issue["comments"]:
@@ -645,7 +678,7 @@ def print_to_disk_bugs(issues, results_folder):
                 ))
 
     # write to output file
-    csv_writer.write_to_csv(output_file, lines)
+    csv_writer.write_to_csv(output_file, lines, append=True)
 
 
 def print_to_disk_extr(issues, results_folder):
@@ -705,7 +738,7 @@ def print_to_disk_extr(issues, results_folder):
                 "commented"  ## event.name
             ))
     # write to output file
-    csv_writer.write_to_csv(output_file, lines)
+    csv_writer.write_to_csv(output_file, lines, append=True)
 
 
 def print_to_disk_gephi(issues, results_folder):
@@ -743,8 +776,8 @@ def print_to_disk_gephi(issues, results_folder):
             edge_lines.append((comment["author"]["name"], comment["id"], ["changeDate"],
                                "Person-Comment"))
     # write to output file
-    csv_writer.write_to_csv(output_file_edges, edge_lines)
-    csv_writer.write_to_csv(output_file_nodes, node_lines)
+    csv_writer.write_to_csv(output_file_edges, edge_lines, append=True)
+    csv_writer.write_to_csv(output_file_nodes, node_lines, append=True)
 
 
 def load_csv(source_folder):
