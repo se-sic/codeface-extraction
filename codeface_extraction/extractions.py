@@ -359,7 +359,7 @@ class EmailExtraction(Extraction):
         # for subclasses
         self.sql = """
                     SELECT a.name AS authorName, a.email1, m.messageId, m.creationDate, m.creationDateOffset,
-                           m.subject, m.threadId
+                           m.subject, CONCAT(m.mlId, "#", m.threadId) as threadId
 
                     FROM project p
 
@@ -373,7 +373,7 @@ class EmailExtraction(Extraction):
                     WHERE p.name = '{project}'
                     AND p.analysisMethod = '{tagging}'
 
-                    ORDER BY m.threadId, m.creationDate ASC
+                    ORDER BY threadId, m.creationDate ASC
 
                     # LIMIT 10
                 """
@@ -537,7 +537,7 @@ class EmailRangeExtraction(Extraction):
         # for subclasses
         self.sql = """
                     SELECT a.name AS authorName, a.email1, m.messageId, m.creationDate, m.creationDateOffset,
-                           m.subject, m.threadId
+                           m.subject, CONCAT(m.mlId, "#", m.threadId) as threadId
 
                     FROM project p
 
@@ -561,7 +561,7 @@ class EmailRangeExtraction(Extraction):
                     AND l2.tag = '{revision}'
                     AND m.creationDate BETWEEN l1.date AND l2.date
 
-                    ORDER BY m.threadId, m.creationDate ASC
+                    ORDER BY threadId, m.creationDate ASC
 
                     # LIMIT 10
                 """
