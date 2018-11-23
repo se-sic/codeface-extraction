@@ -93,7 +93,7 @@ def get_parser():
 
     :return: the constructed parser
     """
-    run_parser = argparse.ArgumentParser(prog='codeface', description='Codeface extraction')
+    run_parser = argparse.ArgumentParser(prog='codeface-extraction', description='Codeface extraction')
     run_parser.add_argument('-c', '--config', help="Codeface configuration file",
                             default='codeface.conf')
     run_parser.add_argument('-p', '--project', help="Project configuration file",
