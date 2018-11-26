@@ -46,7 +46,7 @@ sys.setdefaultencoding("utf-8")
 
 def run():
     # get all needed paths and argument for the method call.
-    parser = argparse.ArgumentParser(prog="codeface", description="Codeface extraction")
+    parser = argparse.ArgumentParser(prog="codeface-extraction-issues-jira", description="Codeface extraction")
     parser.add_argument("-c", "--config", help="Codeface configuration file", default="codeface.conf")
     parser.add_argument("-p", "--project", help="Project configuration file", required=True)
     parser.add_argument("resdir", help="Directory to store analysis results in")

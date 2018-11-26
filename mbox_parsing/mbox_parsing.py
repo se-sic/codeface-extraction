@@ -227,7 +227,7 @@ def run():
     """Run the mbox-parsing process"""
 
     # get all needed paths and argument for the method call.
-    parser = argparse.ArgumentParser(prog='codeface', description='Codeface extraction')
+    parser = argparse.ArgumentParser(prog='codeface-extraction-mbox', description='Codeface extraction')
     parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
     parser.add_argument('-p', '--project', help="Project configuration file", required=True)
     parser.add_argument('-f', '--filepath', help="Include the filepath in the search", action="store_true")
