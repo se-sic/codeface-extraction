@@ -26,6 +26,7 @@ import os
 import sys
 import time
 import csv
+import json
 
 from xml.dom.minidom import parse
 from datetime import datetime
@@ -610,65 +611,65 @@ def print_to_disk_bugs(issues, results_folder):
             lines.append((
                 issue["externalId"],
                 issue["title"],
-                issue["type_new"],
+                json.dumps(issue["type_new"]),
                 issue["state_new"],
-                issue["resolution_new"],
+                json.dumps(issue["resolution_new"]),
                 issue["creationDate"],
                 issue["resolveDate"],
-                issue["components"],
+                json.dumps(issue["components"]),
                 "created",  ## event.name
                 issue["author"]["name"],
                 issue["author"]["email"],
                 issue["creationDate"],
                 "open",  ## default state when created
-                ["unresolved"]  ## default resolution when created
+                json.dumps(["unresolved"]) ## default resolution when created
             ))
 
             lines.append((
                 issue["externalId"],
                 issue["title"],
-                issue["type_new"],
+                json.dumps(issue["type_new"]),
                 issue["state_new"],
-                issue["resolution_new"],
+                json.dumps(issue["resolution_new"]),
                 issue["creationDate"],
                 issue["resolveDate"],
-                issue["components"],
+                json.dumps(issue["components"]),
                 "commented",
                 issue["author"]["name"],
                 issue["author"]["email"],
                 issue["creationDate"],
                 "open",  ##  default state when created
-                ["unresolved"]  ## default resolution when created
+                json.dumps(["unresolved"])  ## default resolution when created
             ))
 
             for comment in issue["comments"]:
                 lines.append((
                     issue["externalId"],
                     issue["title"],
-                    issue["type_new"],
+                    json.dumps(issue["type_new"]),
                     issue["state_new"],
-                    issue["resolution_new"],
+                    json.dumps(issue["resolution_new"]),
                     issue["creationDate"],
                     issue["resolveDate"],
-                    issue["components"],
+                    json.dumps(issue["components"]),
                     "commented",
                     comment["author"]["name"],
                     comment["author"]["email"],
                     comment["changeDate"],
                     comment["state_on_creation"],
-                    comment["resolution_on_creation"]
+                    json.dumps(comment["resolution_on_creation"])
                 ))
 
             for history in issue["history"]:
                 lines.append((
                     issue["externalId"],
                     issue["title"],
-                    issue["type_new"],
+                    json.dumps(issue["type_new"]),
                     issue["state_new"],
-                    issue["resolution_new"],
+                    json.dumps(issue["resolution_new"]),
                     issue["creationDate"],
                     issue["resolveDate"],
-                    issue["components"],
+                    json.dumps(issue["components"]),
                     history["event"],
                     history["author"]["name"],
                     history["author"]["email"],

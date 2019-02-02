@@ -393,7 +393,7 @@ def reformat_events(issue_data):
                 # "state_new" and "resolution" of the issue give the information about the state and the resolution of
                 # the issue when the comment was written, because the eventsList is sorted by time
                 event["event_info_1"] = issue["state_new"]
-                event["event_info_2"] = str(issue["resolution"])
+                event["event_info_2"] = json.dumps(issue["resolution"])
 
     return issue_data
 
@@ -528,12 +528,12 @@ def print_to_disk_new(issues, results_folder):
             lines.append((
                 issue["number"],
                 issue["title"],
-                issue["type"],
+                json.dumps(issue["type"]),
                 issue["state_new"],
-                issue["resolution"],
+                json.dumps(issue["resolution"]),
                 issue["created_at"],
                 issue["closed_at"],
-                [],  # components
+                json.dumps([]),  # components
                 event["event"],
                 event["user"]["name"],
                 event["user"]["email"],
