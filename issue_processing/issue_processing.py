@@ -79,7 +79,6 @@ def run():
     issues = insert_user_data(issues, __conf)
     # 6) dump result to disk
     print_to_disk(issues, __resdir)
-    print_to_disk_new(issues, __resdir)
 
     log.info("Github issue processing complete!")
 
@@ -484,41 +483,6 @@ def print_to_disk(issues, results_folder):
 
     # construct path to output file
     output_file = os.path.join(results_folder, "issues.list")
-    log.info("Dumping output in file '{}'...".format(output_file))
-
-    # construct lines of output
-    lines = []
-    for issue in issues:
-        for event in issue["eventsList"]:
-            lines.append((
-                issue["number"],
-                issue["state"],
-                issue["created_at"],
-                issue["closed_at"],
-                issue["isPullRequest"],
-                event["user"]["name"],
-                event["user"]["email"],
-                event["created_at"],
-                "" if event["ref_target"] == "" else event["ref_target"]["name"],
-                event["event"]
-            ))
-
-    # write to output file
-    csv_writer.write_to_csv(output_file, lines)
-
-
-def print_to_disk_new(issues, results_folder):
-    """
-    Print issues to file "issues_new.list" in result folder.
-    This file has a consistent format to the "bugs-jira.list" file.
-    TODO When the network library is updated, this is the format which shall be used.
-
-    :param issues: the issues to dump
-    :param results_folder: the folder where to place "issues.list" output file
-    """
-
-    # construct path to output file
-    output_file = os.path.join(results_folder, "new_format.list")
     log.info("Dumping output in file '{}'...".format(output_file))
 
     # construct lines of output
