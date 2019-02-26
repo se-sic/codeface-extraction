@@ -15,7 +15,7 @@
 # Copyright 2017 by Raphael Nömmer <noemmer@fim.uni-passau.de>
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
-# Copyright 2018 by Anselm Fehnker <fehnker@fim.uni-passau.de>
+# Copyright 2018-2019 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file is able to extract Github issue data from json files.
@@ -392,7 +392,7 @@ def reformat_events(issue_data):
                 # "state_new" and "resolution" of the issue give the information about the state and the resolution of
                 # the issue when the comment was written, because the eventsList is sorted by time
                 event["event_info_1"] = issue["state_new"]
-                event["event_info_2"] = json.dumps(issue["resolution"])
+                event["event_info_2"] = issue["resolution"]
 
     return issue_data
 
@@ -503,7 +503,7 @@ def print_to_disk(issues, results_folder):
                 event["user"]["email"],
                 event["created_at"],
                 event["event_info_1"],
-                event["event_info_2"]
+                json.dumps(event["event_info_2"])
             ))
 
     # write to output file

@@ -15,7 +15,7 @@
 # Copyright 2017 by Raphael Nömmer <noemmer@fim.uni-passau.de>
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
-# Copyright 2018 by Anselm Fehnker <fehnker@fim.uni-passau.de>
+# Copyright 2018-2019 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file is able to extract Jira issue data from xml files.
@@ -564,6 +564,8 @@ def print_to_disk(issues, results_folder):
     lines = []
     for issue in issues:
         log.info("Current issue '{}'".format(issue["externalId"]))
+
+        # add the creation event
         lines.append((
             issue["externalId"],
             issue["title"],
@@ -581,6 +583,7 @@ def print_to_disk(issues, results_folder):
             json.dumps(["unresolved"])  ## default resolution when created
         ))
 
+        # add an additional commented event for the creation
         lines.append((
             issue["externalId"],
             issue["title"],
@@ -598,6 +601,7 @@ def print_to_disk(issues, results_folder):
             json.dumps(["unresolved"])  ## default resolution when created
         ))
 
+        # add comment events
         for comment in issue["comments"]:
             lines.append((
                 issue["externalId"],
@@ -616,6 +620,7 @@ def print_to_disk(issues, results_folder):
                 json.dumps(comment["resolution_on_creation"])
             ))
 
+        # add history events
         for history in issue["history"]:
             lines.append((
                 issue["externalId"],
@@ -631,7 +636,7 @@ def print_to_disk(issues, results_folder):
                 history["author"]["email"],
                 history["date"],
                 history["event_info_1"],
-                history["event_info_2"]
+                json.dumps(history["event_info_2"])
             ))
 
     # write to output file
@@ -658,6 +663,8 @@ def print_to_disk_bugs(issues, results_folder):
 
         # only writes issues with type bug and their comments in the output file
         if "bug" in issue["type_list"]:
+
+            # add the creation event
             lines.append((
                 issue["externalId"],
                 issue["title"],
@@ -675,6 +682,7 @@ def print_to_disk_bugs(issues, results_folder):
                 json.dumps(["unresolved"]) ## default resolution when created
             ))
 
+            # add an additional commented event for the creation
             lines.append((
                 issue["externalId"],
                 issue["title"],
@@ -692,6 +700,7 @@ def print_to_disk_bugs(issues, results_folder):
                 json.dumps(["unresolved"])  ## default resolution when created
             ))
 
+            # add comment events
             for comment in issue["comments"]:
                 lines.append((
                     issue["externalId"],
@@ -710,6 +719,7 @@ def print_to_disk_bugs(issues, results_folder):
                     json.dumps(comment["resolution_on_creation"])
                 ))
 
+            # add history events
             for history in issue["history"]:
                 lines.append((
                     issue["externalId"],
@@ -725,7 +735,7 @@ def print_to_disk_bugs(issues, results_folder):
                     history["author"]["email"],
                     history["date"],
                     history["event_info_1"],
-                    history["event_info_2"]
+                    json.dumps(history["event_info_2"])
                 ))
 
     # write to output file
