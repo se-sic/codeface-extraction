@@ -482,7 +482,7 @@ def print_to_disk(issues, results_folder):
     """
 
     # construct path to output file
-    output_file = os.path.join(results_folder, "issues.list")
+    output_file = os.path.join(results_folder, "issues-github.list")
     log.info("Dumping output in file '{}'...".format(output_file))
 
     # construct lines of output
