@@ -40,10 +40,11 @@ from whoosh.qparser import QueryParser
 from csv_writer import csv_writer
 
 
-def __get_index(mbox, results_folder, schema, reindex):
+def __get_index(mbox, mbox_path, results_folder, schema, reindex):
     """Initialize the search index (and create it, if needed
 
-    :param mbox: the file path to the mbox file to create the index for
+    :param mbox: the mbox object to create the index for
+    :param mbox_path: the path to the mbox object on disk
     :param results_folder: the folder to create the index folder in
     :param schema: the schema for the to be created index
     :param reindex: force reindexing if True
@@ -52,16 +53,17 @@ def __get_index(mbox, results_folder, schema, reindex):
 
     # create or load index:
     # 0) construct index path
-    index_path = os.path.join(results_folder, "index")
+    index_path = os.path.join(results_folder, "mbox-index", os.path.basename(mbox_path))
     # 1) if reindexing, remove the index folder
     if os.path.exists(index_path) and reindex:
+        log.devinfo("Removing index from path '{}'...".format(index_path))
         shutil.rmtree(index_path)
     # 2) Check if we need to create the index for Whoosh full-text search
     log.devinfo("Checking for index in results folder...")
     if (not os.path.exists(index_path)) or (not index.exists_in(index_path)):
         # 2.1) create index
         log.devinfo("Creating index for text search in results folder.")
-        os.mkdir(index_path)  # create path
+        os.makedirs(index_path)  # create path
         index.create_in(index_path, schema)  # initialize as index path
         ix = index.open_dir(index_path)  # open as index path
         writer = ix.writer()
@@ -191,7 +193,7 @@ def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reind
     schema = Schema(messageID=ID(stored=True), content=TEXT(analyzer=analyzer))
 
     # create/load index (initialize if necessary)
-    ix = __get_index(mbox, results_folder, schema, reindex)
+    ix = __get_index(mbox, mbox_name, results_folder, schema, reindex)
 
     # extract artifacts from results folder
     artifacts = __get_artifacts(results_folder, files_as_artifacts)
