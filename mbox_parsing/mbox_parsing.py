@@ -172,7 +172,7 @@ def __parse_execute(artifact, schema, my_index, include_filepath):
     return result
 
 
-def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reindex):
+def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reindex, append_result):
     """Parse the given mbox file with the commit information from the results folder.
 
     :param mbox_name: the mbox file to search in
@@ -180,6 +180,7 @@ def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reind
     :param include_filepath: indicator whether to use the 'file name' part of the artifact into account
     :param files_as_artifacts: indicator whether to search for files (base names) as artifacts
     :param reindex: force reindexing if True
+    :param append_result: flag whether to append the results for the current mbox file to the output file
     """
 
     # load mbox file
@@ -203,7 +204,9 @@ def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reind
     log.info("Parsing finished.")
 
     # re-arrange results
-    result = [('file', 'artifact', 'messageID')]
+    result = []
+    if not append_result:
+        result.append(('file', 'artifact', 'messageID'))
     for entry in csv_data:
         for row in entry:
             result.append(row)
@@ -220,7 +223,7 @@ def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reind
 
     # Writes found hits to file.
     log.info("Writing results to file {}.".format(output_file))
-    csv_writer.write_to_csv(output_file, result)
+    csv_writer.write_to_csv(output_file, result, append=append_result)
 
     log.info("Parsing mbox file complete!")
 
@@ -251,7 +254,11 @@ def run():
     # search the mailing lists
     for ml in __conf["mailinglists"]:
         mbox_file = os.path.join(__maildir, ml["name"] + ".mbox")
-        parse(mbox_file, __resdir_project, args.filepath, args.file, args.reindex)
+
+        # append results for all but the first mailing list
+        append_result = ml != __conf["mailinglists"][0]
+
+        parse(mbox_file, __resdir_project, args.filepath, args.file, args.reindex, append_result)
 
 
 if __name__ == "__main__":
