@@ -15,7 +15,7 @@
 # Copyright 2017 by Raphael Nömmer <noemmer@fim.uni-passau.de>
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
-# Copyright 2018 by Anselm Fehnker <fehnker@fim.uni-passau.de>
+# Copyright 2018-2019 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file is able to extract Github issue data from json files.
@@ -79,7 +79,6 @@ def run():
     issues = insert_user_data(issues, __conf)
     # 6) dump result to disk
     print_to_disk(issues, __resdir)
-    print_to_disk_new(issues, __resdir)
 
     log.info("Github issue processing complete!")
 
@@ -393,7 +392,7 @@ def reformat_events(issue_data):
                 # "state_new" and "resolution" of the issue give the information about the state and the resolution of
                 # the issue when the comment was written, because the eventsList is sorted by time
                 event["event_info_1"] = issue["state_new"]
-                event["event_info_2"] = str(issue["resolution"])
+                event["event_info_2"] = issue["resolution"]
 
     return issue_data
 
@@ -483,42 +482,7 @@ def print_to_disk(issues, results_folder):
     """
 
     # construct path to output file
-    output_file = os.path.join(results_folder, "issues.list")
-    log.info("Dumping output in file '{}'...".format(output_file))
-
-    # construct lines of output
-    lines = []
-    for issue in issues:
-        for event in issue["eventsList"]:
-            lines.append((
-                issue["number"],
-                issue["state"],
-                issue["created_at"],
-                issue["closed_at"],
-                issue["isPullRequest"],
-                event["user"]["name"],
-                event["user"]["email"],
-                event["created_at"],
-                "" if event["ref_target"] == "" else event["ref_target"]["name"],
-                event["event"]
-            ))
-
-    # write to output file
-    csv_writer.write_to_csv(output_file, lines)
-
-
-def print_to_disk_new(issues, results_folder):
-    """
-    Print issues to file "issues_new.list" in result folder.
-    This file has a consistent format to the "bugs-jira.list" file.
-    TODO When the network library is updated, this is the format which shall be used.
-
-    :param issues: the issues to dump
-    :param results_folder: the folder where to place "issues.list" output file
-    """
-
-    # construct path to output file
-    output_file = os.path.join(results_folder, "new_format.list")
+    output_file = os.path.join(results_folder, "issues-github.list")
     log.info("Dumping output in file '{}'...".format(output_file))
 
     # construct lines of output
@@ -528,18 +492,18 @@ def print_to_disk_new(issues, results_folder):
             lines.append((
                 issue["number"],
                 issue["title"],
-                issue["type"],
+                json.dumps(issue["type"]),
                 issue["state_new"],
-                issue["resolution"],
+                json.dumps(issue["resolution"]),
                 issue["created_at"],
                 issue["closed_at"],
-                [],  # components
+                json.dumps([]),  # components
                 event["event"],
                 event["user"]["name"],
                 event["user"]["email"],
                 event["created_at"],
                 event["event_info_1"],
-                event["event_info_2"]
+                json.dumps(event["event_info_2"])
             ))
 
     # write to output file

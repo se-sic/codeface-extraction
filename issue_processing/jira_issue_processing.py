@@ -15,7 +15,7 @@
 # Copyright 2017 by Raphael Nömmer <noemmer@fim.uni-passau.de>
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
-# Copyright 2018 by Anselm Fehnker <fehnker@fim.uni-passau.de>
+# Copyright 2018-2019 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file is able to extract Jira issue data from xml files.
@@ -26,6 +26,7 @@ import os
 import sys
 import time
 import csv
+import json
 
 from xml.dom.minidom import parse
 from datetime import datetime
@@ -261,12 +262,10 @@ def parse_xml(issue_data, persons, skip_history):
 
         type = issue_x.getElementsByTagName("type")[0]
         issue["type"] = type.firstChild.data
-        # TODO new consistent format with GitHub issues. Not supported by the network library yet
-        issue["type_new"] = ["issue", str(type.firstChild.data.lower())]
+        issue["type_list"] = ["issue", str(type.firstChild.data.lower())]
 
         status = issue_x.getElementsByTagName("status")[0]
         issue["state"] = status.firstChild.data
-        # TODO new consistent format with GitHub issues. Not supported by the network library yet
         issue["state_new"] = status.firstChild.data.lower()
 
         project = issue_x.getElementsByTagName("project")[0]
@@ -274,16 +273,15 @@ def parse_xml(issue_data, persons, skip_history):
 
         resolution = issue_x.getElementsByTagName("resolution")[0]
         issue["resolution"] = resolution.firstChild.data
-        # new consistent format with GitHub issues. Not supported by the network library yet
-        issue["resolution_new"] = [str(resolution.firstChild.data.lower())]
+        issue["resolution_list"] = [str(resolution.firstChild.data.lower())]
 
         # consistency to default GitHub labels
         if issue["resolution"] == "Won't Fix":
-            issue["resolution_new"] = ["wontfix"]
+            issue["resolution_list"] = ["wontfix"]
 
         # consistency to default GitHub labels
         if issue["resolution"] == "Won't Do":
-            issue["resolution_new"] = ["wontdo"]
+            issue["resolution_list"] = ["wontdo"]
 
         for component in issue_x.getElementsByTagName("component"):
             components.append(str(component.firstChild.data))
@@ -566,20 +564,79 @@ def print_to_disk(issues, results_folder):
     lines = []
     for issue in issues:
         log.info("Current issue '{}'".format(issue["externalId"]))
-        lines.append((issue["author"]["name"],
-                      issue["author"]["email"],
-                      issue["externalId"],
-                      issue["creationDate"],
-                      issue["externalId"],
-                      issue["type"]))
+
+        # add the creation event
+        lines.append((
+            issue["externalId"],
+            issue["title"],
+            json.dumps(issue["type_list"]),
+            issue["state_new"],
+            json.dumps(issue["resolution_list"]),
+            issue["creationDate"],
+            issue["resolveDate"],
+            json.dumps(issue["components"]),
+            "created",  ## event.name
+            issue["author"]["name"],
+            issue["author"]["email"],
+            issue["creationDate"],
+            "open",  ## default state when created
+            json.dumps(["unresolved"])  ## default resolution when created
+        ))
+
+        # add an additional commented event for the creation
+        lines.append((
+            issue["externalId"],
+            issue["title"],
+            json.dumps(issue["type_list"]),
+            issue["state_new"],
+            json.dumps(issue["resolution_list"]),
+            issue["creationDate"],
+            issue["resolveDate"],
+            json.dumps(issue["components"]),
+            "commented",
+            issue["author"]["name"],
+            issue["author"]["email"],
+            issue["creationDate"],
+            "open",  ##  default state when created
+            json.dumps(["unresolved"])  ## default resolution when created
+        ))
+
+        # add comment events
         for comment in issue["comments"]:
             lines.append((
+                issue["externalId"],
+                issue["title"],
+                json.dumps(issue["type_list"]),
+                issue["state_new"],
+                json.dumps(issue["resolution_list"]),
+                issue["creationDate"],
+                issue["resolveDate"],
+                json.dumps(issue["components"]),
+                "commented",
                 comment["author"]["name"],
                 comment["author"]["email"],
-                comment["id"],
                 comment["changeDate"],
+                comment["state_on_creation"],
+                json.dumps(comment["resolution_on_creation"])
+            ))
+
+        # add history events
+        for history in issue["history"]:
+            lines.append((
                 issue["externalId"],
-                "comment"
+                issue["title"],
+                json.dumps(issue["type_list"]),
+                issue["state_new"],
+                json.dumps(issue["resolution_list"]),
+                issue["creationDate"],
+                issue["resolveDate"],
+                json.dumps(issue["components"]),
+                history["event"],
+                history["author"]["name"],
+                history["author"]["email"],
+                history["date"],
+                history["event_info_1"],
+                json.dumps(history["event_info_2"])
             ))
 
     # write to output file
@@ -590,7 +647,6 @@ def print_to_disk_bugs(issues, results_folder):
     """
     Sorts of bug issues and prints them to file "bugs-jira.list" in result folder
     This method prints in a new format which is consistent to the format of "print_to_disk_new" in "issue_processing.py".
-    TODO When the network library is updated this format shall be used in all print to disk methods.
 
     :param issues: the issues to sort of bugs
     :param results_folder: the folder where to place "bugs-jira.list" output file
@@ -606,75 +662,80 @@ def print_to_disk_bugs(issues, results_folder):
         log.info("Current issue '{}'".format(issue["externalId"]))
 
         # only writes issues with type bug and their comments in the output file
-        if "bug" in issue["type_new"]:
+        if "bug" in issue["type_list"]:
+
+            # add the creation event
             lines.append((
                 issue["externalId"],
                 issue["title"],
-                issue["type_new"],
+                json.dumps(issue["type_list"]),
                 issue["state_new"],
-                issue["resolution_new"],
+                json.dumps(issue["resolution_list"]),
                 issue["creationDate"],
                 issue["resolveDate"],
-                issue["components"],
+                json.dumps(issue["components"]),
                 "created",  ## event.name
                 issue["author"]["name"],
                 issue["author"]["email"],
                 issue["creationDate"],
                 "open",  ## default state when created
-                ["unresolved"]  ## default resolution when created
+                json.dumps(["unresolved"]) ## default resolution when created
             ))
 
+            # add an additional commented event for the creation
             lines.append((
                 issue["externalId"],
                 issue["title"],
-                issue["type_new"],
+                json.dumps(issue["type_list"]),
                 issue["state_new"],
-                issue["resolution_new"],
+                json.dumps(issue["resolution_list"]),
                 issue["creationDate"],
                 issue["resolveDate"],
-                issue["components"],
+                json.dumps(issue["components"]),
                 "commented",
                 issue["author"]["name"],
                 issue["author"]["email"],
                 issue["creationDate"],
                 "open",  ##  default state when created
-                ["unresolved"]  ## default resolution when created
+                json.dumps(["unresolved"])  ## default resolution when created
             ))
 
+            # add comment events
             for comment in issue["comments"]:
                 lines.append((
                     issue["externalId"],
                     issue["title"],
-                    issue["type_new"],
+                    json.dumps(issue["type_list"]),
                     issue["state_new"],
-                    issue["resolution_new"],
+                    json.dumps(issue["resolution_list"]),
                     issue["creationDate"],
                     issue["resolveDate"],
-                    issue["components"],
+                    json.dumps(issue["components"]),
                     "commented",
                     comment["author"]["name"],
                     comment["author"]["email"],
                     comment["changeDate"],
                     comment["state_on_creation"],
-                    comment["resolution_on_creation"]
+                    json.dumps(comment["resolution_on_creation"])
                 ))
 
+            # add history events
             for history in issue["history"]:
                 lines.append((
                     issue["externalId"],
                     issue["title"],
-                    issue["type_new"],
+                    json.dumps(issue["type_list"]),
                     issue["state_new"],
-                    issue["resolution_new"],
+                    json.dumps(issue["resolution_list"]),
                     issue["creationDate"],
                     issue["resolveDate"],
-                    issue["components"],
+                    json.dumps(issue["components"]),
                     history["event"],
                     history["author"]["name"],
                     history["author"]["email"],
                     history["date"],
                     history["event_info_1"],
-                    history["event_info_2"]
+                    json.dumps(history["event_info_2"])
                 ))
 
     # write to output file
