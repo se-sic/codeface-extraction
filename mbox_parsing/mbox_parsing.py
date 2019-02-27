@@ -13,7 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2017 by Raphael Nömmer <noemmer@fim.uni-passau.de>
-# Copyright 2017-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
+# Copyright 2017-2019 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Thomas Bock <bockthom@fim.uni-passau.de>
 # All Rights Reserved.
 """
@@ -29,10 +29,11 @@ import shutil
 import sys
 from os.path import abspath
 
-import whoosh.index as index  # import create_in, open_dir, exists_in
 from codeface.cli import log
 from codeface.configuration import Configuration
 from joblib import Parallel, delayed
+from whoosh import index  # import create_in, open_dir, exists_in
+from whoosh.analysis import StandardAnalyzer
 from whoosh.fields import Schema, TEXT, ID
 from whoosh.qparser import QueryParser
 
@@ -91,7 +92,7 @@ def __get_artifacts(results_folder, files_as_artifacts):
         "date", "author.name", "author.email",  # author information
         "committer.date", "committer.name", "committer.email",  # committer information
         "hash", "changed.files", "added.lines", "deleted.lines", "diff.size",  # commit information
-        "file", "artifact", "artifact.type", "artifact.diff.size"  ## commit-dependency information
+        "file", "artifact", "artifact.type", "artifact.diff.size"  # commit-dependency information
     ]
 
     commit_set = set()
@@ -136,12 +137,12 @@ def __mbox_getbody(message):
     return unicode(body, errors="replace")
 
 
-def __parse_execute(artifact, schema, index, include_filepath):
+def __parse_execute(artifact, schema, my_index, include_filepath):
     """ Execute the search for the given commit
 
     :param artifact: the (file name, artifact) tuple to search for
     :param schema: the search schema to use
-    :param index: the search index to use
+    :param my_index: the search index to use
     :param include_filepath: indicator whether to use the 'file name' part of the artifact into account
     :return: a match list of tuples (file name, artifact, message ID)
     """
@@ -150,18 +151,18 @@ def __parse_execute(artifact, schema, index, include_filepath):
 
     result = []
 
-    with index.searcher() as searcher:
+    with my_index.searcher() as searcher:
         # initialize query parser
         query_parser = QueryParser("content", schema=schema)
 
         # construct query
         if include_filepath:
-            my_query = query_parser.parse(artifact[0] + " AND " + artifact[1])
+            my_query = query_parser.parse('"%s" AND "%s"' % (artifact[0], artifact[1]))
         else:
-            my_query = query_parser.parse(artifact[1])
+            my_query = query_parser.parse("\"%s\"" % artifact[1])
 
         # search!
-        query_result = searcher.search(my_query, terms=True)
+        query_result = searcher.search(my_query, terms=True, optimize=False)
 
         # construct result from query answer
         for r in query_result:
@@ -185,7 +186,8 @@ def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reind
     mbox = mailbox.mbox(mbox_name)
 
     # create schema for text search
-    schema = Schema(messageID=ID(stored=True), content=TEXT)
+    analyzer = StandardAnalyzer(expression=r"[^\s,:\"']+")  # split by whitespace, commas, colons, and quotation marks.
+    schema = Schema(messageID=ID(stored=True), content=TEXT(analyzer=analyzer))
 
     # create/load index (initialize if necessary)
     ix = __get_index(mbox, results_folder, schema, reindex)
