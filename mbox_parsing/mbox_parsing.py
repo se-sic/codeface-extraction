@@ -13,7 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2017 by Raphael Nömmer <noemmer@fim.uni-passau.de>
-# Copyright 2017-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
+# Copyright 2017-2019 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Thomas Bock <bockthom@fim.uni-passau.de>
 # All Rights Reserved.
 """
@@ -29,20 +29,22 @@ import shutil
 import sys
 from os.path import abspath
 
-import whoosh.index as index  # import create_in, open_dir, exists_in
 from codeface.cli import log
 from codeface.configuration import Configuration
 from joblib import Parallel, delayed
+from whoosh import index  # import create_in, open_dir, exists_in
+from whoosh.analysis import StandardAnalyzer
 from whoosh.fields import Schema, TEXT, ID
 from whoosh.qparser import QueryParser
 
 from csv_writer import csv_writer
 
 
-def __get_index(mbox, results_folder, schema, reindex):
+def __get_index(mbox, mbox_path, results_folder, schema, reindex):
     """Initialize the search index (and create it, if needed
 
-    :param mbox: the file path to the mbox file to create the index for
+    :param mbox: the mbox object to create the index for
+    :param mbox_path: the path to the mbox object on disk
     :param results_folder: the folder to create the index folder in
     :param schema: the schema for the to be created index
     :param reindex: force reindexing if True
@@ -51,16 +53,17 @@ def __get_index(mbox, results_folder, schema, reindex):
 
     # create or load index:
     # 0) construct index path
-    index_path = os.path.join(results_folder, "index")
+    index_path = os.path.join(results_folder, "mbox-index", os.path.basename(mbox_path))
     # 1) if reindexing, remove the index folder
     if os.path.exists(index_path) and reindex:
+        log.devinfo("Removing index from path '{}'...".format(index_path))
         shutil.rmtree(index_path)
     # 2) Check if we need to create the index for Whoosh full-text search
     log.devinfo("Checking for index in results folder...")
     if (not os.path.exists(index_path)) or (not index.exists_in(index_path)):
         # 2.1) create index
         log.devinfo("Creating index for text search in results folder.")
-        os.mkdir(index_path)  # create path
+        os.makedirs(index_path)  # create path
         index.create_in(index_path, schema)  # initialize as index path
         ix = index.open_dir(index_path)  # open as index path
         writer = ix.writer()
@@ -91,7 +94,7 @@ def __get_artifacts(results_folder, files_as_artifacts):
         "date", "author.name", "author.email",  # author information
         "committer.date", "committer.name", "committer.email",  # committer information
         "hash", "changed.files", "added.lines", "deleted.lines", "diff.size",  # commit information
-        "file", "artifact", "artifact.type", "artifact.diff.size"  ## commit-dependency information
+        "file", "artifact", "artifact.type", "artifact.diff.size"  # commit-dependency information
     ]
 
     commit_set = set()
@@ -136,12 +139,12 @@ def __mbox_getbody(message):
     return unicode(body, errors="replace")
 
 
-def __parse_execute(artifact, schema, index, include_filepath):
+def __parse_execute(artifact, schema, my_index, include_filepath):
     """ Execute the search for the given commit
 
     :param artifact: the (file name, artifact) tuple to search for
     :param schema: the search schema to use
-    :param index: the search index to use
+    :param my_index: the search index to use
     :param include_filepath: indicator whether to use the 'file name' part of the artifact into account
     :return: a match list of tuples (file name, artifact, message ID)
     """
@@ -150,18 +153,18 @@ def __parse_execute(artifact, schema, index, include_filepath):
 
     result = []
 
-    with index.searcher() as searcher:
+    with my_index.searcher() as searcher:
         # initialize query parser
         query_parser = QueryParser("content", schema=schema)
 
         # construct query
         if include_filepath:
-            my_query = query_parser.parse(artifact[0] + " AND " + artifact[1])
+            my_query = query_parser.parse('"%s" AND "%s"' % (artifact[0], artifact[1]))
         else:
-            my_query = query_parser.parse(artifact[1])
+            my_query = query_parser.parse("\"%s\"" % artifact[1])
 
         # search!
-        query_result = searcher.search(my_query, terms=True)
+        query_result = searcher.search(my_query, terms=True, optimize=False)
 
         # construct result from query answer
         for r in query_result:
@@ -171,7 +174,7 @@ def __parse_execute(artifact, schema, index, include_filepath):
     return result
 
 
-def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reindex):
+def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reindex, append_result):
     """Parse the given mbox file with the commit information from the results folder.
 
     :param mbox_name: the mbox file to search in
@@ -179,16 +182,18 @@ def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reind
     :param include_filepath: indicator whether to use the 'file name' part of the artifact into account
     :param files_as_artifacts: indicator whether to search for files (base names) as artifacts
     :param reindex: force reindexing if True
+    :param append_result: flag whether to append the results for the current mbox file to the output file
     """
 
     # load mbox file
     mbox = mailbox.mbox(mbox_name)
 
     # create schema for text search
-    schema = Schema(messageID=ID(stored=True), content=TEXT)
+    analyzer = StandardAnalyzer(expression=r"[^\s,:\"']+")  # split by whitespace, commas, colons, and quotation marks.
+    schema = Schema(messageID=ID(stored=True), content=TEXT(analyzer=analyzer))
 
     # create/load index (initialize if necessary)
-    ix = __get_index(mbox, results_folder, schema, reindex)
+    ix = __get_index(mbox, mbox_name, results_folder, schema, reindex)
 
     # extract artifacts from results folder
     artifacts = __get_artifacts(results_folder, files_as_artifacts)
@@ -201,7 +206,9 @@ def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reind
     log.info("Parsing finished.")
 
     # re-arrange results
-    result = [('file', 'artifact', 'messageID')]
+    result = []
+    if not append_result:
+        result.append(('file', 'artifact', 'messageID'))
     for entry in csv_data:
         for row in entry:
             result.append(row)
@@ -218,7 +225,7 @@ def parse(mbox_name, results_folder, include_filepath, files_as_artifacts, reind
 
     # Writes found hits to file.
     log.info("Writing results to file {}.".format(output_file))
-    csv_writer.write_to_csv(output_file, result)
+    csv_writer.write_to_csv(output_file, result, append=append_result)
 
     log.info("Parsing mbox file complete!")
 
@@ -249,7 +256,11 @@ def run():
     # search the mailing lists
     for ml in __conf["mailinglists"]:
         mbox_file = os.path.join(__maildir, ml["name"] + ".mbox")
-        parse(mbox_file, __resdir_project, args.filepath, args.file, args.reindex)
+
+        # append results for all but the first mailing list
+        append_result = ml != __conf["mailinglists"][0]
+
+        parse(mbox_file, __resdir_project, args.filepath, args.file, args.reindex, append_result)
 
 
 if __name__ == "__main__":
