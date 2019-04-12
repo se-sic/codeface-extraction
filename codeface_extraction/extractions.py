@@ -13,7 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2015-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
-# Copyright 2016, 2018 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2016, 2018-2019 by Thomas Bock <bockthom@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018 by Tina Schuh <schuht@fim.uni-passau.de>
 # All Rights Reserved.
@@ -28,6 +28,7 @@ import re
 from ftfy import fix_encoding
 
 from codeface.cli import log
+from codeface.util import gen_range_path
 
 
 #
@@ -152,11 +153,12 @@ class Extraction(object):
 
         return result
 
-    def _get_out_file(self, start_revision, end_revision, entity_type):
+    def _get_out_file(self, range_number, start_revision, end_revision, entity_type):
         """
         Return the file path to which the output of this extraction shall be written.
         This methods ensures that the paths are existent.
 
+        :param range_number: the consecutive number of a range (for range-level extractions)
         :param start_revision: start of an release range (for range-level extractions)
         :param end_revision: end of an release range (for range-level extractions)
         :param entity_type: the artifact to be (probably) encoded in the file name
@@ -164,11 +166,9 @@ class Extraction(object):
         """
 
         # get result directory
-        dir = os.path.join(
-            self.project_res_dir,
-            "{0}-{1}".format(start_revision, end_revision)
+        dir = (gen_range_path(self.project_res_dir, range_number, start_revision, end_revision)
             if not self.is_project_level()
-            else "",
+            else os.path.join(self.project_res_dir, "")
         )
 
         # make sure the result dir exists
@@ -196,10 +196,11 @@ class Extraction(object):
 
         self.csv_writer.write_to_csv(outfile, lines)
 
-    def run(self, start_revision=None, end_revision=None):
+    def run(self, range_number=None, start_revision=None, end_revision=None):
         """
         Runs the extraction.
 
+        :param range_number: the consecutive number of a range (for range-level extractions)
         :param start_revision: start of an release range (for range-level extractions)
         :param end_revision: end of an release range (for range-level extractions)
         """
@@ -212,12 +213,12 @@ class Extraction(object):
             log.info("%s: %s to %s" %
                      (self.project,
                       self.__class__.__name__,
-                      self._get_out_file(start_revision, end_revision, entity_type)
+                      self._get_out_file(range_number, start_revision, end_revision, entity_type)
                       ))
 
             result = self._run_sql(end_revision, entity_type)
             lines = self._reduce_result(result)
-            outfile = self._get_out_file(start_revision, end_revision, entity_type)
+            outfile = self._get_out_file(range_number, start_revision, end_revision, entity_type)
             self._write_export_file(lines, outfile)
 
 

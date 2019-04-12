@@ -13,7 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2015-2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
-# Copyright 2016, 2018 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2016, 2018-2019 by Thomas Bock <bockthom@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # All Rights Reserved.
 """
@@ -78,11 +78,12 @@ def run_extraction(conf, resdir, extract_commit_messages, extract_impl, extract_
         for i in range(len(revs) - 1):
             start_rev = revs[i]
             end_rev = revs[i + 1]
+            range_number = i + 1
 
-            log.info("%s: Extracting data for version '%s'" % (conf["project"], end_rev))
+            log.info("%s: Extracting data for range %s [version '%s']" % (conf["project"], range_number, end_rev))
 
             for extraction in __extractions_range:
-                extraction.run(start_rev, end_rev)
+                extraction.run(range_number, start_rev, end_rev)
 
     log.info("Extraction complete!")
 
