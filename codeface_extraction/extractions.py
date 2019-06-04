@@ -26,6 +26,7 @@ import os
 import unicodedata
 import re
 from ftfy import fix_encoding
+from email.header import decode_header, make_header
 
 from codeface.cli import log
 from codeface.util import gen_range_path
@@ -250,6 +251,11 @@ class AuthorExtraction(Extraction):
                     # LIMIT 10
                 """
 
+    def _reduce_result(self, result):
+        # fix name encoding
+        return [(id, fix_name_encoding(name), email)
+                for (id, name, email) in result]
+
 
 class CommitExtraction(Extraction):
     def __init__(self, dbm, conf, resdir, csv_writer):
@@ -287,6 +293,17 @@ class CommitExtraction(Extraction):
 
                     # LIMIT 10
                 """
+
+    def _reduce_result(self, result):
+        # fix name encoding
+        return [(id, authorDate, fix_name_encoding(authorName), authorEmail,
+                 commitDate, fix_name_encoding(committerName), committerEmail,
+                 commitHash, changedFiles, addedLines, deletedLines, diffSize,
+                 file, entityId, entityType, size)
+                for (id, authorDate, authorName, authorEmail,
+                     commitDate, committerName, committerEmail,
+                     commitHash, changedFiles, addedLines, deletedLines, diffSize,
+                     file, entityId, entityType, size) in result]
 
 
 class CommitMessageExtraction(Extraction):
@@ -379,6 +396,13 @@ class EmailExtraction(Extraction):
                     # LIMIT 10
                 """
 
+    def _reduce_result(self, result):
+        # fix name encoding
+        return [(fix_name_encoding(name), email, messageId, creationDate, creationDateOffset,
+                 subject, threadId)
+                for (name, email, messageId, creationDate, creationDateOffset,
+                     subject, threadId) in result]
+
 
 class RevisionExtraction(Extraction):
     def __init__(self, dbm, conf, resdir, csv_writer):
@@ -439,6 +463,11 @@ class AuthorRangeExtraction(Extraction):
                     # LIMIT 10
                 """
 
+    def _reduce_result(self, result):
+        # fix name encoding
+        return [(id, fix_name_encoding(name), email)
+                for (id, name, email) in result]
+
 
 class CommitRangeExtraction(Extraction):
     """This is basically the CommitExtraction, but for one range only."""
@@ -487,6 +516,17 @@ class CommitRangeExtraction(Extraction):
 
                     # LIMIT 10
                 """
+
+    def _reduce_result(self, result):
+        # fix name encoding
+        return [(id, authorDate, fix_name_encoding(authorName), authorEmail,
+                 committerDate, fix_name_encoding(committerName), committerEmail,
+                 commitHash, changedFiles, addedLines, deletedLines, diffSize,
+                 file, entityId, entityType, size)
+                for (id, authorDate, authorName, authorEmail,
+                     commitDate, committerName, committerEmail,
+                     commitHash, changedFiles, addedLines, deletedLines, diffSize,
+                     file, entityId, entityType, size) in result]
 
 
 class CommitMessageRangeExtraction(Extraction):
@@ -567,6 +607,13 @@ class EmailRangeExtraction(Extraction):
                     # LIMIT 10
                 """
 
+    def _reduce_result(self, result):
+        # fix name encoding
+        return [(fix_name_encoding(name), email, messageId, creationDate, creationDateOffset,
+                 subject, threadId)
+                for (name, email, messageId, creationDate, creationDateOffset,
+                     subject, threadId) in result]
+
 
 class FunctionImplementationRangeExtraction(Extraction):
     def __init__(self, dbm, conf, resdir, csv_writer):
@@ -634,3 +681,29 @@ def fix_characters_in_string(text):
     new_text = u"".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in new_text.decode("unicode-escape"))
 
     return new_text
+
+
+def fix_name_encoding(name):
+    """
+    Fix encoding of names (originating from e-mail headers).
+    :param name: expects a name string extracted from the database
+    :return: unicode string of the name (correctly encoded)
+    """
+
+    # encode utf-8
+    name = name.encode('utf-8')
+
+    # find out character set of the encoded name
+    info = decode_header(str(name))
+
+    try:
+        # Apply correct encoding and return unicode string
+        return unicode(make_header(info))
+    except UnicodeDecodeError:
+        # Undo utf-8 encoding and return unicode string
+        return unicode(name.decode('utf-8'))
+    except LookupError:
+        # Encoding not found, return string as is
+        return name
+    return name
+
