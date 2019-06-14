@@ -164,7 +164,7 @@ def __parse_execute(artifact, schema, my_index, include_filepath):
             my_query = query_parser.parse("\"%s\"" % artifact[1])
 
         # search!
-        query_result = searcher.search(my_query, terms=True, optimize=False)
+        query_result = searcher.search(my_query, terms=True, optimize=False, limit=None)
 
         # construct result from query answer
         for r in query_result:
