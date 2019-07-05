@@ -239,11 +239,10 @@ def merge_issue_events(issue_data):
         # the format of every related commit is adjusted to the event format
         for rel_commit in issue["relatedCommits"]:
 
-            # if the related commit has no time, it is a commit in the pull-request
-            if rel_commit["referenced_at"] is None:
-                rel_commit["user"] = create_user("", "", "")
-                rel_commit["created_at"] = ""
-                rel_commit["event"] = "has_commit"
+            # if the related commit has no user name, it is a commit which was added to the pull request
+            if rel_commit["user"]["username"] is None or rel_commit["user"]["username"] == "":
+                rel_commit["created_at"] = format_time(rel_commit["referenced_at"])
+                rel_commit["event"] = "commit_added"
                 rel_commit["event_info_1"] = rel_commit["commit_id"]
                 rel_commit["event_info_2"] = ""
                 rel_commit["ref_target"] = ""
