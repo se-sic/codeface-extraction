@@ -176,6 +176,10 @@ def reformat_issues(issue_data):
         if issue["relatedCommits"] is None:
             issue["relatedCommits"] = []
 
+        # if an issue has no reviewsList, an empty Listgets created
+        if issue["reviewsList"] is None:
+            issue["reviewsList"] = []
+
         # if an issue has no relatedIssues, an empty List gets created
         if "relatedIssues" not in issue:
             issue["relatedIssues"] = []
@@ -264,6 +268,39 @@ def merge_issue_events(issue_data):
             # cache comment by date to resolve/re-arrange references later
             comments[comment["created_at"]] = comment
 
+        # the format of every review and their comments is adjusted to the event format
+        for review in issue["reviewsList"]:
+            review["event"] = "reviewed"
+            review["created_at"] = format_time(review["submitted_at"])
+            review["event_info_1"] = review["state"].lower()
+            review["event_info_2"] = ""
+            review["ref_target"] = ""
+
+            if review["hasReviewInitialComment"]:
+                comment["event"] = "commented"
+                comment["user"] = review["user"]
+                comment["ref_target"] = ""
+                comment["created_at"] = format_time(review["submitted_at"])
+                comment["event_info_1"] = ""
+                comment["event_info_2"] = ""
+
+                issue["commentsList"].append(comment)
+
+                # cache comment by date to resolve/re-arrange references later
+                comments[comment["created_at"]] = comment
+
+            for reviewComment in review["reviewComments"]:
+                reviewComment["event"] = "commented"
+                reviewComment["created_at"] = format_time(reviewComment["referenced_at"])
+                reviewComment["ref_target"] = ""
+                reviewComment["event_info_1"] = ""
+                reviewComment["event_info_2"] = ""
+
+                # cache comment by date to resolve/re-arrange references later
+                comments[reviewComment["created_at"]] = reviewComment
+
+                issue["commentsList"].append(reviewComment)
+
         # the format of every event is adjusted
         for event in issue["eventsList"]:
             event["ref_target"] = ""
@@ -283,9 +320,15 @@ def merge_issue_events(issue_data):
                     event["ref_target"] = event["user"]
                     event["user"] = comment["user"]
 
+            # if event is a referenced commit, we can update the user information
+            if event["event"] == "referenced" and event["commit"] is not None:
+                event["user"]["name"] = event["commit"]["author"]["name"] # author or committer?
+                event["user"]["email"] = event["commit"]["author"]["email"]
+                event["user"]["username"] = event["commit"]["author"]["username"]
+
         # merge events, relatedCommits, relatedIssues and comment lists
         issue["eventsList"] = issue["commentsList"] + issue["eventsList"] + issue["relatedIssues"] + issue[
-            "relatedCommits"]
+            "relatedCommits"] + issue["reviewsList"]
 
         # remove events without user
         issue["eventsList"] = [event for event in issue["eventsList"] if
