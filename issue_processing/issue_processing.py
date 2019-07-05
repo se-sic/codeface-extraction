@@ -352,8 +352,33 @@ def reformat_events(issue_data):
 
     for issue in issue_data:
 
+        users = dict()
+
+        for event in issue["eventsList"]:
+
+            if not event["user"]["username"] in users.keys():
+                if not event["user"]["username"] is None or event["user"]["username"] == "":
+                    users[event["user"]["username"]] = event["user"]
+            else:
+                user = users[event["user"]["username"]]
+                if user["name"] is None or user["name"] == "":
+                    user["name"] = event["user"]["name"]
+                if user["email"] is None or user["email"] == "":
+                    user["email"] = event["user"]["email"]
+
         # re-format information of every event in the eventsList of an issue
         for event in issue["eventsList"]:
+
+            if (event["user"]["name"] == "" or event["user"]["name"] is None or
+                event["user"]["email"] is None or event["user"]["email"] == ""):
+
+                event["user"] = users[event["user"]["username"]]
+
+            if (event["ref_target"] != "" and
+                (event["ref_target"]["name"] == "" or event["ref_target"]["name"] is None or
+                 event["ref_target"]["email"] is None or event["ref_target"]["email"] == ""
+                )):
+                event["ref_target"] = users[event["ref_target"]["username"]]
 
             if event["event"] == "closed":
                 event["event"] = "state_updated"
