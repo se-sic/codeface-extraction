@@ -123,11 +123,11 @@ def __mbox_getbody(message):
         for part in message.walk():
             if part.is_multipart():
                 for subpart in part.walk():
-                    if __text_indicator in subpart.get_content_type():
+                    if __text_indicator in subpart.get_content_type().lower():
                         body = subpart.get_payload(decode=True)
-            elif __text_indicator in part.get_content_type():
+            elif __text_indicator in part.get_content_type().lower():
                 body = part.get_payload(decode=True)
-    elif __text_indicator in message.get_content_type():
+    elif __text_indicator in message.get_content_type().lower():
         body = message.get_payload(decode=True)
 
     if body is None:
