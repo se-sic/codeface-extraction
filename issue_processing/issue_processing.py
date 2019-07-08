@@ -27,7 +27,7 @@ import json
 import os
 import sys
 import urllib
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import operator
 from codeface.cli import log
@@ -118,6 +118,19 @@ def format_time(time):
     else:
         d = dateparser.parse(time)
         return d.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def subtract_seconds_from_time(time, seconds):
+    """
+    Subtract the specified number of seconds from a date string
+
+    :param time: the date string to subtract the specified seconds from
+    :param seconds: the number of seconds to subtract from the date string
+    :return: the date string after subtracting the specified number of seconds
+    """
+
+    new_time = datetime.strptime(time, "%Y-%m-%d %H:%M:%S") - timedelta(seconds = seconds)
+    return new_time.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def create_user(name, username, email):
@@ -313,6 +326,14 @@ def merge_issue_events(issue_data):
             # if event collides with a comment
             if event["created_at"] in comments:
                 comment = comments[event["created_at"]]
+                # if someone gets mentioned or subscribed by someone else in a comment,
+                # re-write the reference
+                if (event["event"] == "mentioned" or event["event"] == "subscribed") and \
+                                comment["event"] == "commented":
+                    event["ref_target"] = event["user"]
+                    event["user"] = comment["user"]
+            elif subtract_seconds_from_time(event["created_at"], 1) in comments:
+                comment = comments[subtract_seconds_from_time(event["created_at"], 1)]
                 # if someone gets mentioned or subscribed by someone else in a comment,
                 # re-write the reference
                 if (event["event"] == "mentioned" or event["event"] == "subscribed") and \
