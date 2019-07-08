@@ -347,6 +347,10 @@ def merge_issue_events(issue_data):
                 event["user"]["email"] = event["commit"]["author"]["email"]
                 event["user"]["username"] = event["commit"]["author"]["username"]
 
+            # if event is a review request, we can update the ref target with the requested reviewer
+            if event["event"] == "review_requested":
+                event["ref_target"] = event["requestedReviewer"]
+
         # merge events, relatedCommits, relatedIssues and comment lists
         issue["eventsList"] = issue["commentsList"] + issue["eventsList"] + issue["relatedIssues"] + issue[
             "relatedCommits"] + issue["reviewsList"]
