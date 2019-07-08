@@ -276,17 +276,18 @@ def merge_issue_events(issue_data):
             review["ref_target"] = ""
 
             if review["hasReviewInitialComment"]:
-                comment["event"] = "commented"
-                comment["user"] = review["user"]
-                comment["ref_target"] = ""
-                comment["created_at"] = format_time(review["submitted_at"])
-                comment["event_info_1"] = ""
-                comment["event_info_2"] = ""
+                initialComment = dict()
+                initialComment["event"] = "commented"
+                initialComment["user"] = review["user"]
+                initialComment["ref_target"] = ""
+                initialComment["created_at"] = format_time(review["submitted_at"])
+                initialComment["event_info_1"] = ""
+                initialComment["event_info_2"] = ""
 
-                issue["commentsList"].append(comment)
+                issue["commentsList"].append(initialComment)
 
                 # cache comment by date to resolve/re-arrange references later
-                comments[comment["created_at"]] = comment
+                comments[initialComment["created_at"]] = initialComment
 
             for reviewComment in review["reviewComments"]:
                 reviewComment["event"] = "commented"
