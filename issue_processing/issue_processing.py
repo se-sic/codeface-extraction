@@ -375,9 +375,9 @@ def reformat_events(issue_data):
 
     log.info("Update event information ...")
 
-    for issue in issue_data:
+    users = dict()
 
-        users = dict()
+    for issue in issue_data:
 
         for event in issue["eventsList"]:
 
@@ -390,6 +390,7 @@ def reformat_events(issue_data):
                     user["name"] = event["user"]["name"]
                 if user["email"] is None or user["email"] == "":
                     user["email"] = event["user"]["email"]
+    for issue in issue_data:
 
         # re-format information of every event in the eventsList of an issue
         for event in issue["eventsList"]:
