@@ -389,6 +389,11 @@ def merge_issue_events(issue_data):
                         review["state"] = review["event_info_1"] = event["state"]
                         review["event_info_2"] = "later_dismissed"
 
+            # if event is assign event, we have set the user to the assigner and the ref target to the assignee
+            if event["event"] == "assigned":
+                event["ref_target"] = event["user"]
+                event["user"] = event["assigner"]
+
         # merge events, relatedCommits, relatedIssues and comment lists
         issue["eventsList"] = issue["commentsList"] + issue["eventsList"] + issue["relatedIssues"] + issue[
             "relatedCommits"] + issue["reviewsList"]
