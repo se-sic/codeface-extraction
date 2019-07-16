@@ -602,4 +602,4 @@ def print_to_disk(issues, results_folder):
             ))
 
     # write to output file
-    csv_writer.write_to_csv(output_file, lines)
+    csv_writer.write_to_csv(output_file, sorted(set(lines), key=lambda line: lines.index(line)))
