@@ -327,6 +327,24 @@ def merge_issue_events(issue_data):
 
                 issue["commentsList"].append(reviewComment)
 
+        # add dismissal comments to the list of comments
+        for event in issue["eventsList"]:
+
+            if (event["event"] == "review_dismissed" and not event["dismissalMessage"] is None
+               and not event["dismissalMessage"] == ""):
+                dismissalComment = dict()
+                dismissalComment["event"] = "commented"
+                dismissalComment["user"] = event["user"]
+                dismissalComment["created_at"] = format_time(event["created_at"])
+                dismissalComment["ref_target"] = ""
+                dismissalComment["event_info_1"] = ""
+                dismissalComment["event_info_2"] = ""
+
+                # cache comment by date to resolve/re-arrange references later
+                comments[dismissalComment["created_at"]] = dismissalComment
+
+                issue["commentsList"].append(dismissalComment)
+
         # the format of every event is adjusted
         for event in issue["eventsList"]:
             event["ref_target"] = ""
@@ -371,19 +389,6 @@ def merge_issue_events(issue_data):
                         review["state"] = review["event_info_1"] = event["state"]
                         review["event_info_2"] = "later_dismissed"
 
-                if not event["dismissalMessage"] is None and not event["dismissalMessage"] == "":
-                    dismissalComment = dict()
-                    dismissalComment["event"] = "commented"
-                    dismissalComment["user"] = event["user"]
-                    dismissalComment["created_at"] = format_time(event["created_at"])
-                    dismissalComment["ref_target"] = ""
-                    dismissalComment["event_info_1"] = ""
-                    dismissalComment["event_info_2"] = ""
-
-                    # cache comment by date to resolve/re-arrange references later
-                    comments[dismissalComment["created_at"]] = dismissalComment
-
-                    issue["commentsList"].append(dismissalComment)
         # merge events, relatedCommits, relatedIssues and comment lists
         issue["eventsList"] = issue["commentsList"] + issue["eventsList"] + issue["relatedIssues"] + issue[
             "relatedCommits"] + issue["reviewsList"]
