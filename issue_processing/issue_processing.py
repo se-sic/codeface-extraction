@@ -257,14 +257,14 @@ def merge_issue_events(issue_data):
             if rel_commit["type"] == "commitAddedToPullRequest":
                 rel_commit["created_at"] = format_time(rel_commit["referenced_at"])
                 rel_commit["event"] = "commit_added"
-                rel_commit["event_info_1"] = rel_commit["commit_id"]
+                rel_commit["event_info_1"] = rel_commit["commit"]["hash"]
                 rel_commit["event_info_2"] = ""
                 rel_commit["ref_target"] = ""
             # else it is a commit the issue/ pull-request refers to
             else:
                 rel_commit["created_at"] = format_time(rel_commit["referenced_at"])
                 rel_commit["event"] = "add_link"
-                rel_commit["event_info_1"] = rel_commit["commit_id"]
+                rel_commit["event_info_1"] = rel_commit["commit"]["hash"]
                 rel_commit["event_info_2"] = "commit"
                 rel_commit["ref_target"] = ""
 
@@ -398,10 +398,27 @@ def reformat_events(issue_data):
 
     users = dict()
 
+    # create a dictionary of users to merge GitHub usernames and names and e-mails originating from the git repository
     for issue in issue_data:
 
         for event in issue["eventsList"]:
 
+            # 1) add or update users which are authors of commits
+            #    (committers of commits are usually the actor of the current event and will be dealt with in part 2 below)
+            if event["event"] == "commit_added" or (event["event"] == "add_link" and event["event_info_2"] == "commit"):
+                author = event["commit"]["author"]
+
+                if not author["username"] in users.keys():
+                    if not author["username"] is None and not author["username"] == "":
+                        users[author["username"]] = author
+                else:
+                    user = users[author["username"]]
+                    if user["name"] is None or user["name"] == "":
+                        user["name"] = author["name"]
+                    if user["email"] is None or user["email"] == "":
+                        user["email"] = author["email"]
+
+            # 2) add or update users which are actor of the current event
             if not event["user"]["username"] in users.keys():
                 if not event["user"]["username"] is None and not event["user"]["username"] == "":
                     users[event["user"]["username"]] = event["user"]
@@ -411,6 +428,8 @@ def reformat_events(issue_data):
                     user["name"] = event["user"]["name"]
                 if user["email"] is None or user["email"] == "":
                     user["email"] = event["user"]["email"]
+
+    # as the user dictionary is created, start re-formating the event information of all issues
     for issue in issue_data:
 
         # re-format information of every event in the eventsList of an issue
