@@ -379,7 +379,7 @@ def merge_issue_events(issue_data):
                 event["user"]["username"] = event["commit"]["author"]["username"]
 
             # if event is a review request, we can update the ref target with the requested reviewer
-            if event["event"] == "review_requested":
+            if event["event"] == "review_requested" or event["event"] == "review_request_removed":
                 event["ref_target"] = event["requestedReviewer"]
 
             # if event dismisses a review, we can determine the original state of the corresponding review
@@ -390,7 +390,7 @@ def merge_issue_events(issue_data):
                         review["event_info_2"] = "later_dismissed"
 
             # if event is assign event, we have set the user to the assigner and the ref target to the assignee
-            if event["event"] == "assigned":
+            if event["event"] == "assigned" or event["event"] == "unassigned":
                 event["ref_target"] = event["user"]
                 event["user"] = event["assigner"]
 
