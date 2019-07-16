@@ -252,8 +252,9 @@ def merge_issue_events(issue_data):
         # the format of every related commit is adjusted to the event format
         for rel_commit in issue["relatedCommits"]:
 
-            # if the related commit has no user name, it is a commit which was added to the pull request
-            if rel_commit["user"]["username"] is None or rel_commit["user"]["username"] == "":
+            # if the related commit is not of type "commit" but "commitAddedToPullRequest",
+            # it is a commit which was added to the pull request
+            if rel_commit["type"] == "commitAddedToPullRequest":
                 rel_commit["created_at"] = format_time(rel_commit["referenced_at"])
                 rel_commit["event"] = "commit_added"
                 rel_commit["event_info_1"] = rel_commit["commit_id"]
@@ -382,7 +383,7 @@ def reformat_events(issue_data):
         for event in issue["eventsList"]:
 
             if not event["user"]["username"] in users.keys():
-                if not event["user"]["username"] is None or event["user"]["username"] == "":
+                if not event["user"]["username"] is None and not event["user"]["username"] == "":
                     users[event["user"]["username"]] = event["user"]
             else:
                 user = users[event["user"]["username"]]
