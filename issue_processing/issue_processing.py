@@ -352,6 +352,26 @@ def merge_issue_events(issue_data):
             if event["event"] == "review_requested":
                 event["ref_target"] = event["requestedReviewer"]
 
+            # if event dismisses a review, we can determine the original state of the corresponding review
+            if event["event"] == "review_dismissed":
+                for review in issue["reviewsList"]:
+                    if review["reviewId"] == event["reviewId"]:
+                        review["state"] = review["event_info_1"] = event["state"]
+                        review["event_info_2"] = "later_dismissed"
+
+                if not event["dismissalMessage"] is None and not event["dismissalMessage"] == "":
+                    dismissalComment = dict()
+                    dismissalComment["event"] = "commented"
+                    dismissalComment["user"] = event["user"]
+                    dismissalComment["created_at"] = format_time(event["created_at"])
+                    dismissalComment["ref_target"] = ""
+                    dismissalComment["event_info_1"] = ""
+                    dismissalComment["event_info_2"] = ""
+
+                    # cache comment by date to resolve/re-arrange references later
+                    comments[dismissalComment["created_at"]] = dismissalComment
+
+                    issue["commentsList"].append(dismissalComment)
         # merge events, relatedCommits, relatedIssues and comment lists
         issue["eventsList"] = issue["commentsList"] + issue["eventsList"] + issue["relatedIssues"] + issue[
             "relatedCommits"] + issue["reviewsList"]
