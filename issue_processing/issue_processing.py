@@ -479,6 +479,18 @@ def reformat_events(issue_data):
                 if user["email"] is None or user["email"] == "":
                     user["email"] = event["user"]["email"]
 
+            # 3) add or update users which are ref_target of the current event
+            if not event["ref_target"] is None and not event["ref_target"] == "":
+                if not event["ref_target"]["username"] in users.keys():
+                    if not event["ref_target"]["username"] is None and not event["ref_target"]["username"] == "":
+                        users[event["ref_target"]["username"]] = event["ref_target"]
+                else:
+                    user = users[event["ref_target"]["username"]]
+                    if user["name"] is None or user["name"] == "":
+                        user["name"] = event["user"]["name"]
+                    if user["email"] is None or user["email"] == "":
+                        user["email"] = event["user"]["email"]
+
     # as the user dictionary is created, start re-formating the event information of all issues
     for issue in issue_data:
 
