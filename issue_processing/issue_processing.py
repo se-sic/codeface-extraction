@@ -241,17 +241,16 @@ def merge_issue_events(issue_data):
         issue["eventsList"].append(created_event)
         issue["state_new"] = "open"
 
-        # if the creation event contains a comment, add it to the list of comments
-        if not issue["body"] is None and not issue["body"] == "":
-            creationComment = dict()
-            creationComment["event"] = "commented"
-            creationComment["user"] = issue["user"]
-            creationComment["referenced_at"] = issue["created_at"]
-            creationComment["ref_target"] = ""
-            creationComment["event_info_1"] = ""
-            creationComment["event_info_2"] = ""
+        # adds commented event for the creation-event comment to the commentsList
+        creationComment = dict()
+        creationComment["event"] = "commented"
+        creationComment["user"] = issue["user"]
+        creationComment["referenced_at"] = issue["created_at"]
+        creationComment["ref_target"] = ""
+        creationComment["event_info_1"] = ""
+        creationComment["event_info_2"] = ""
 
-            issue["commentsList"].append(creationComment)
+        issue["commentsList"].append(creationComment)
 
         # the format of every related issue is adjusted to the event format
         for rel_issue in issue["relatedIssues"]:
