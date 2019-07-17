@@ -226,6 +226,8 @@ def merge_issue_events(issue_data):
 
     log.info("Merge issue events ...")
 
+    issue_data_to_update = dict()
+
     for issue in issue_data:
 
         # temporary container for references
@@ -260,6 +262,27 @@ def merge_issue_events(issue_data):
             rel_issue["event_info_2"] = "issue"
             rel_issue["ref_target"] = ""
 
+            # the related issues states that a user has add a link to another issue within the issue of interest,
+            # now we add an event for the referenced issue which states that it was referenced
+            referenced_issue_event = dict()
+            referenced_issue_event["created_at"] = format_time(rel_issue["referenced_at"])
+            referenced_issue_event["event"] = "referenced_by"
+            referenced_issue_event["user"] = rel_issue["user"]
+            referenced_issue_event["event_info_1"] = issue["number"]
+            referenced_issue_event["event_info_2"] = "issue"
+            referenced_issue_event["ref_target"] = ""
+
+            # as we cannot update the referenced issue during iterating over all issues, we need to save the
+            # referenced_by event for the referenced issue temporarily
+            if rel_issue["number"] in issue_data_to_update.keys():
+                issue_data_to_update[rel_issue["number"]]["eventsList"].append(referenced_issue_event)
+            else:
+                ref = dict()
+                ref["number"] = rel_issue["number"]
+                ref["eventsList"] = list()
+                ref["eventsList"].append(referenced_issue_event)
+                issue_data_to_update[rel_issue["number"]] = ref
+
         # the format of every related commit is adjusted to the event format
         for rel_commit in issue["relatedCommits"]:
 
@@ -274,7 +297,7 @@ def merge_issue_events(issue_data):
             # else it is a commit the issue/ pull-request refers to
             else:
                 rel_commit["created_at"] = format_time(rel_commit["referenced_at"])
-                rel_commit["event"] = "add_link"
+                rel_commit["event"] = "add_link" # TODO: differentiate between "add_link" (mention commit in issue)  and "referenced_by" (reference issue in commit)
                 rel_commit["event_info_1"] = rel_commit["commit"]["hash"]
                 rel_commit["event_info_2"] = "commit"
                 rel_commit["ref_target"] = ""
@@ -403,6 +426,12 @@ def merge_issue_events(issue_data):
 
         # sorts eventsList by time
         issue["eventsList"] = sorted(issue["eventsList"], key=lambda k: k["created_at"])
+
+    # updates all the issues by the temporarily stored referenced_by events
+    for key, value in issue_data_to_update.iteritems():
+        for issue in issue_data:
+            if issue["number"] == value["number"]:
+                issue["eventsList"] = issue["eventsList"] + value["eventsList"]
 
     return issue_data
 
@@ -548,6 +577,9 @@ def reformat_events(issue_data):
                 # the issue when the comment was written, because the eventsList is sorted by time
                 event["event_info_1"] = issue["state_new"]
                 event["event_info_2"] = issue["resolution"]
+
+        # sorts eventsList by time again
+        issue["eventsList"] = sorted(issue["eventsList"], key=lambda k: k["created_at"])
 
     return issue_data
 
