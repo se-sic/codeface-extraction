@@ -286,21 +286,25 @@ def merge_issue_events(issue_data):
         # the format of every related commit is adjusted to the event format
         for rel_commit in issue["relatedCommits"]:
 
+            rel_commit["created_at"] = format_time(rel_commit["referenced_at"])
+            rel_commit["event_info_1"] = rel_commit["commit"]["hash"]
+            rel_commit["event_info_2"] = ""
+            rel_commit["ref_target"] = ""
+
             # if the related commit is not of type "commit" but "commitAddedToPullRequest",
             # it is a commit which was added to the pull request
             if rel_commit["type"] == "commitAddedToPullRequest":
-                rel_commit["created_at"] = format_time(rel_commit["referenced_at"])
                 rel_commit["event"] = "commit_added"
-                rel_commit["event_info_1"] = rel_commit["commit"]["hash"]
-                rel_commit["event_info_2"] = ""
-                rel_commit["ref_target"] = ""
-            # else it is a commit the issue/ pull-request refers to
-            else:
-                rel_commit["created_at"] = format_time(rel_commit["referenced_at"])
-                rel_commit["event"] = "add_link" # TODO: differentiate between "add_link" (mention commit in issue)  and "referenced_by" (reference issue in commit)
-                rel_commit["event_info_1"] = rel_commit["commit"]["hash"]
+
+            # if the related commit was mentioned in an issue comment:
+            elif rel_commit["type"] == "commitMentionedInIssue":
+                rel_commit["event"] = "add_link"
                 rel_commit["event_info_2"] = "commit"
-                rel_commit["ref_target"] = ""
+
+            # else it is a commit which references issue/pull-request
+            else:
+                rel_commit["event"] = "referenced_by"
+                rel_commit["event_info_2"] = "commit"
 
         # the format of every comment is adjusted to the event format
         for comment in issue["commentsList"]:
@@ -455,7 +459,8 @@ def reformat_events(issue_data):
 
             # 1) add or update users which are authors of commits
             #    (committers of commits are usually the actor of the current event and will be dealt with in part 2 below)
-            if event["event"] == "commit_added" or (event["event"] == "add_link" and event["event_info_2"] == "commit"):
+            if (event["event"] == "commit_added" or (event["event"] == "add_link" and event["event_info_2"] == "commit")
+                or (event["event"] == "referenced_by" and event["event_info_2"] == "commit")):
                 author = event["commit"]["author"]
 
                 if not author["username"] in users.keys():
