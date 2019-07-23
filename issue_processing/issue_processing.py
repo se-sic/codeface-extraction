@@ -517,6 +517,8 @@ def reformat_events(issue_data):
     # as the user dictionary is created, start re-formating the event information of all issues
     for issue in issue_data:
 
+        events_to_remove = list()
+
         # re-format information of every event in the eventsList of an issue
         for event in issue["eventsList"]:
 
@@ -588,7 +590,7 @@ def reformat_events(issue_data):
                     type_event["ref_target"] = ""
                     issue["eventsList"].append(type_event)
 
-                    # if the label is in this list, it also is a resolution of the issue
+                # if the label is in this list, it also is a resolution of the issue
                 elif label in known_resolutions:
                     issue["resolution"].remove(str(label))
 
@@ -608,8 +610,17 @@ def reformat_events(issue_data):
                 event["event_info_1"] = issue["state_new"]
                 event["event_info_2"] = issue["resolution"]
 
+            elif event["event"] == "referenced" and not event["commit"] is None:
+                # remove "referenced" events originating from commits
+                # as they are handled as referenced commit
+                events_to_remove.append(event)
+
         # sorts eventsList by time again
         issue["eventsList"] = sorted(issue["eventsList"], key=lambda k: k["created_at"])
+
+        # remove unwanted events
+        for event_to_remove in events_to_remove:
+            issue["eventsList"].remove(event_to_remove)
 
     return issue_data
 
