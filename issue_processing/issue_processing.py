@@ -47,6 +47,8 @@ known_resolutions = {"unresolved", "fixed", "wontfix", "duplicate", "invalid", "
                      "resolved", "not a bug", "workaround", "staged", "delivered", "information provided",
                      "works for me", "feedback received", "wontdo"}
 
+# datetime format string
+datetime_format = "%Y-%m-%d %H:%M:%S"
 
 def run():
     # get all needed paths and argument for the method call.
@@ -117,7 +119,7 @@ def format_time(time):
         return ""
     else:
         d = dateparser.parse(time)
-        return d.strftime("%Y-%m-%d %H:%M:%S")
+        return d.strftime(datetime_format)
 
 
 def subtract_seconds_from_time(time, seconds):
@@ -129,13 +131,13 @@ def subtract_seconds_from_time(time, seconds):
     :return: the date string after subtracting the specified number of seconds
     """
 
-    new_time = datetime.strptime(time, "%Y-%m-%d %H:%M:%S") - timedelta(seconds = seconds)
-    return new_time.strftime("%Y-%m-%d %H:%M:%S")
+    new_time = datetime.strptime(time, datetime_format) - timedelta(seconds = seconds)
+    return new_time.strftime(datetime_format)
 
 
 def create_user(name, username, email):
     """
-    Creates an user object with all needed information
+    Creates a user object with all needed information
 
     :param name: the name the user shall have
     :param username: the username the user shall have
@@ -156,6 +158,48 @@ def create_user(name, username, email):
     user["email"] = email
 
     return user
+
+
+def lookup_user(user_dict, user):
+    """
+    Alters a user object in the case that name or email are missing by the corresponding name and email
+    from a given user dictionary
+
+    :param user_dict: the user dictionary
+    :param user: the user object to lookup in the dictionary
+    :return: the altered user object in case of a lookup
+             or the unaltered user object otherwise
+    """
+
+    if (user["name"] == "" or user["name"] is None or
+        user["email"] is None or user["email"] == ""):
+
+        user = user_dict[user["username"]]
+
+    return user
+
+
+def update_user_dict(user_dict, user):
+    """
+    Adds or updates users to merge GitHub usernames and names and e-mail addresses originating from the git repository
+
+    :param user_dict: the user dictionary
+    :param user: the user object to add to or update in the dictionary
+    :return: the updated user dictionary
+    """
+
+    if not user["username"] in user_dict.keys():
+        if not user["username"] is None and not user["username"] == "":
+            user_dict[user["username"]] = user
+    else:
+        user_in_dict = user_dict[user["username"]]
+        if user_in_dict["name"] is None or user_in_dict["name"] == "":
+            user_in_dict["name"] = user["name"]
+        if user_in_dict["email"] is None or user_in_dict["email"] == "":
+            user_in_dict["email"] = user["email"]
+        user_dict[user["username"]] = user_in_dict
+
+    return user_dict
 
 
 def reformat_issues(issue_data):
@@ -461,40 +505,14 @@ def reformat_events(issue_data):
             #    (committers of commits are usually the actor of the current event and will be dealt with in part 2 below)
             if (event["event"] == "commit_added" or (event["event"] == "add_link" and event["event_info_2"] == "commit")
                 or (event["event"] == "referenced_by" and event["event_info_2"] == "commit")):
-                author = event["commit"]["author"]
-
-                if not author["username"] in users.keys():
-                    if not author["username"] is None and not author["username"] == "":
-                        users[author["username"]] = author
-                else:
-                    user = users[author["username"]]
-                    if user["name"] is None or user["name"] == "":
-                        user["name"] = author["name"]
-                    if user["email"] is None or user["email"] == "":
-                        user["email"] = author["email"]
+                users = update_user_dict(users, event["commit"]["author"])
 
             # 2) add or update users which are actor of the current event
-            if not event["user"]["username"] in users.keys():
-                if not event["user"]["username"] is None and not event["user"]["username"] == "":
-                    users[event["user"]["username"]] = event["user"]
-            else:
-                user = users[event["user"]["username"]]
-                if user["name"] is None or user["name"] == "":
-                    user["name"] = event["user"]["name"]
-                if user["email"] is None or user["email"] == "":
-                    user["email"] = event["user"]["email"]
+            users = update_user_dict(users, event["user"])
 
             # 3) add or update users which are ref_target of the current event
             if not event["ref_target"] is None and not event["ref_target"] == "":
-                if not event["ref_target"]["username"] in users.keys():
-                    if not event["ref_target"]["username"] is None and not event["ref_target"]["username"] == "":
-                        users[event["ref_target"]["username"]] = event["ref_target"]
-                else:
-                    user = users[event["ref_target"]["username"]]
-                    if user["name"] is None or user["name"] == "":
-                        user["name"] = event["ref_target"]["name"]
-                    if user["email"] is None or user["email"] == "":
-                        user["email"] = event["ref_target"]["email"]
+                users = update_user_dict(users, event["ref_target"])
 
     # as the user dictionary is created, start re-formating the event information of all issues
     for issue in issue_data:
@@ -502,16 +520,11 @@ def reformat_events(issue_data):
         # re-format information of every event in the eventsList of an issue
         for event in issue["eventsList"]:
 
-            if (event["user"]["name"] == "" or event["user"]["name"] is None or
-                event["user"]["email"] is None or event["user"]["email"] == ""):
+            # lookup user in dictionary
+            event["user"] = lookup_user(users, event["user"])
+            if (event["ref_target"] != ""):
+                event["ref_target"] = lookup_user(users, event["ref_target"])
 
-                event["user"] = users[event["user"]["username"]]
-
-            if (event["ref_target"] != "" and
-                (event["ref_target"]["name"] == "" or event["ref_target"]["name"] is None or
-                 event["ref_target"]["email"] is None or event["ref_target"]["email"] == ""
-                )):
-                event["ref_target"] = users[event["ref_target"]["username"]]
 
             if event["event"] == "closed":
                 event["event"] = "state_updated"
