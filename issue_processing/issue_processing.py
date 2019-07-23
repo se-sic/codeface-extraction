@@ -492,9 +492,9 @@ def reformat_events(issue_data):
                 else:
                     user = users[event["ref_target"]["username"]]
                     if user["name"] is None or user["name"] == "":
-                        user["name"] = event["user"]["name"]
+                        user["name"] = event["ref_target"]["name"]
                     if user["email"] is None or user["email"] == "":
-                        user["email"] = event["user"]["email"]
+                        user["email"] = event["ref_target"]["email"]
 
     # as the user dictionary is created, start re-formating the event information of all issues
     for issue in issue_data:
