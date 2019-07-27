@@ -174,7 +174,9 @@ def lookup_user(user_dict, user):
     if (user["name"] == "" or user["name"] is None or
         user["email"] is None or user["email"] == ""):
 
-        user = user_dict[user["username"]]
+        # lookup user only if username is not None and not empty
+        if not user["username"] is None and not user["username"] == "":
+            user = user_dict[user["username"]]
 
     return user
 
