@@ -16,6 +16,7 @@
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018-2019 by Anselm Fehnker <fehnker@fim.uni-passau.de>
+# Copyright 2019 by Thomas Bock <bockthom@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file is able to extract Github issue data from json files.
