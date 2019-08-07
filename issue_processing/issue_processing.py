@@ -446,6 +446,8 @@ def merge_issue_events(issue_data):
 
             # if event is a referenced commit, we can update the user information
             if event["event"] == "referenced" and event["commit"] is not None:
+                if (event["user"] is None):
+                    event["user"] = dict()
                 event["user"]["name"] = event["commit"]["author"]["name"] # author or committer?
                 event["user"]["email"] = event["commit"]["author"]["email"]
                 event["user"]["username"] = event["commit"]["author"]["username"]
