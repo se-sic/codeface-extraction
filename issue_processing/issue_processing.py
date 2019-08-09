@@ -583,7 +583,8 @@ def reformat_events(issue_data):
 
                 # if the label is in this list, it also is a type of the issue
                 if label in known_types:
-                    issue["type"].remove(str(label))
+                    if label in issue["type"]:
+                        issue["type"].remove(str(label))
 
                     # creates an event for type updates and adds it to the eventsList
                     type_event = dict()
@@ -597,7 +598,8 @@ def reformat_events(issue_data):
 
                 # if the label is in this list, it also is a resolution of the issue
                 elif label in known_resolutions:
-                    issue["resolution"].remove(str(label))
+                    if label in issue["resolution"]:
+                        issue["resolution"].remove(str(label))
 
                     # creates an event for resolution updates and adds it to the eventsList
                     resolution_event = dict()
