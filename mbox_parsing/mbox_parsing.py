@@ -14,7 +14,7 @@
 #
 # Copyright 2017 by Raphael Nömmer <noemmer@fim.uni-passau.de>
 # Copyright 2017-2019 by Claus Hunsen <hunsen@fim.uni-passau.de>
-# Copyright 2018 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2018-2019 by Thomas Bock <bockthom@fim.uni-passau.de>
 # All Rights Reserved.
 """
 This file is able to extract artifact occurrences in e-mail within mbox files.
@@ -123,11 +123,11 @@ def __mbox_getbody(message):
         for part in message.walk():
             if part.is_multipart():
                 for subpart in part.walk():
-                    if __text_indicator in subpart.get_content_type():
+                    if __text_indicator in subpart.get_content_type().lower():
                         body = subpart.get_payload(decode=True)
-            elif __text_indicator in part.get_content_type():
+            elif __text_indicator in part.get_content_type().lower():
                 body = part.get_payload(decode=True)
-    elif __text_indicator in message.get_content_type():
+    elif __text_indicator in message.get_content_type().lower():
         body = message.get_payload(decode=True)
 
     if body is None:
