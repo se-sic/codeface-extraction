@@ -520,7 +520,7 @@ class CommitRangeExtraction(Extraction):
     def _reduce_result(self, result):
         # fix name encoding
         return [(id, authorDate, fix_name_encoding(authorName), authorEmail,
-                 committerDate, fix_name_encoding(committerName), committerEmail,
+                 commitDate, fix_name_encoding(committerName), committerEmail,
                  commitHash, changedFiles, addedLines, deletedLines, diffSize,
                  file, entityId, entityType, size)
                 for (id, authorDate, authorName, authorEmail,
