@@ -14,6 +14,7 @@
 #
 # Copyright 2015-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2016, 2018-2019 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2019 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018 by Tina Schuh <schuht@fim.uni-passau.de>
 # All Rights Reserved.
@@ -265,7 +266,7 @@ class CommitExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT c.id,
+                    SELECT MIN(c.id),
                            c.authorDate, a.name, a.email1,
                            c.commitDate, acom.name, acom.email1,
                            c.commitHash, c.ChangedFiles, c.AddedLines, c.DeletedLines, c.DiffSize,
@@ -288,6 +289,9 @@ class CommitExtraction(Extraction):
                     # filter for current project
                     WHERE p.name = '{project}'
                     AND p.analysisMethod = '{tagging}'
+
+                    # filter duplicated commits
+                    GROUP BY c.commitHash, cd.file, cd.entityId, cd.entityType
 
                     ORDER BY c.authorDate, a.name, c.id, cd.file, cd.entityId
 
