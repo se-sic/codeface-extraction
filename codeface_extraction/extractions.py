@@ -638,6 +638,20 @@ class EmailRangeExtraction(Extraction):
                     AND l2.tag = '{revision}'
                     AND m.creationDate BETWEEN l1.date AND l2.date
 
+                    # remove e-mails from previous range
+                    AND m.messageId NOT IN (SELECT m2.messageId
+                                            FROM project p
+                                            JOIN release_range r0 ON r0.projectId = p.id
+                                            JOIN release_range r1 ON r1.projectId = p.id
+                                            JOIN release_timeline l0 ON r0.releaseStartId = l0.id
+                                            JOIN release_timeline l1 ON r0.releaseEndId = l1.id
+                                            JOIN release_timeline l2 ON r1.releaseEndId = l2.id
+                                            JOIN mail m2 ON m2.creationDate BETWEEN l0.date AND l1.date
+                                            WHERE l2.tag = '{revision}'
+                                            AND r0.releaseEndId = r1.releaseStartId
+                                            AND p.name = '{project}'
+                                            AND p.analysisMethod = '{tagging}' )
+
                     ORDER BY threadId, m.creationDate ASC
 
                     # LIMIT 10
