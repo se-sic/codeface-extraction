@@ -516,6 +516,19 @@ class CommitRangeExtraction(Extraction):
                     AND p.analysisMethod = '{tagging}'
                     AND l2.tag = '{revision}'
 
+                    # remove commits from previous range
+                    AND c.commitHash NOT IN (SELECT c2.commitHash
+                                             FROM project p
+                                             JOIN release_range r0 ON r0.projectId = p.id
+                                             JOIN release_range r1 ON r1.projectId = p.id
+                                             JOIN release_timeline l0 ON r0.releaseEndId = l0.id
+                                             JOIN release_timeline l2 ON r1.releaseEndId = l2.id
+                                             JOIN commit c2 ON r0.id = c2.releaseRangeId
+                                             WHERE l2.tag = '{revision}'
+                                             AND r0.releaseEndId = r1.releaseStartId
+                                             AND p.name = '{project}'
+                                             AND p.analysisMethod = '{tagging}' )
+
                     ORDER BY c.authorDate, a.name, c.id, cd.file, cd.entityId
 
                     # LIMIT 10
