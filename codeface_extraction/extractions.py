@@ -522,12 +522,11 @@ class CommitRangeExtraction(Extraction):
                     AND p.analysisMethod = '{tagging}'
                     AND l2.tag = '{revision}'
 
-                    # remove commits from previous range
+                    # remove commits from previous range (each range includes its end)
                     AND c.commitHash NOT IN (SELECT c2.commitHash
                                              FROM project p
                                              JOIN release_range r0 ON r0.projectId = p.id
                                              JOIN release_range r1 ON r1.projectId = p.id
-                                             JOIN release_timeline l0 ON r0.releaseEndId = l0.id
                                              JOIN release_timeline l2 ON r1.releaseEndId = l2.id
                                              JOIN commit c2 ON r0.id = c2.releaseRangeId
                                              WHERE l2.tag = '{revision}'
@@ -581,12 +580,11 @@ class CommitMessageRangeExtraction(Extraction):
                     AND p.analysisMethod = '{tagging}'
                     AND l2.tag = '{revision}'
 
-                    # remove commits from previous range
+                    # remove commits from previous range (each range includes its end)
                     AND c.commitHash NOT IN (SELECT c2.commitHash
                                              FROM project p
                                              JOIN release_range r0 ON r0.projectId = p.id
                                              JOIN release_range r1 ON r1.projectId = p.id
-                                             JOIN release_timeline l0 ON r0.releaseEndId = l0.id
                                              JOIN release_timeline l2 ON r1.releaseEndId = l2.id
                                              JOIN commit c2 ON r0.id = c2.releaseRangeId
                                              WHERE l2.tag = '{revision}'
@@ -638,7 +636,7 @@ class EmailRangeExtraction(Extraction):
                     AND l2.tag = '{revision}'
                     AND m.creationDate BETWEEN l1.date AND l2.date
 
-                    # remove e-mails from previous range
+                    # remove e-mails from previous range (each range includes its end)
                     AND m.messageId NOT IN (SELECT m2.messageId
                                             FROM project p
                                             JOIN release_range r0 ON r0.projectId = p.id
@@ -698,12 +696,11 @@ class FunctionImplementationRangeExtraction(Extraction):
                     AND l2.tag = '{revision}'
                     AND cd.file IS NOT NULL
 
-                    # remove commits from previous range
+                    # remove commits from previous range (each range includes its end)
                     AND c.commitHash NOT IN (SELECT c2.commitHash
                                              FROM project p
                                              JOIN release_range r0 ON r0.projectId = p.id
                                              JOIN release_range r1 ON r1.projectId = p.id
-                                             JOIN release_timeline l0 ON r0.releaseEndId = l0.id
                                              JOIN release_timeline l2 ON r1.releaseEndId = l2.id
                                              JOIN commit c2 ON r0.id = c2.releaseRangeId
                                              WHERE l2.tag = '{revision}'
