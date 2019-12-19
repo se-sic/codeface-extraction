@@ -14,6 +14,7 @@
 #
 # Copyright 2015-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2016, 2018-2019 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2019 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018 by Tina Schuh <schuht@fim.uni-passau.de>
 # All Rights Reserved.
@@ -265,7 +266,7 @@ class CommitExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT c.id,
+                    SELECT MIN(c.id),
                            c.authorDate, a.name, a.email1,
                            c.commitDate, acom.name, acom.email1,
                            c.commitHash, c.ChangedFiles, c.AddedLines, c.DeletedLines, c.DiffSize,
@@ -288,6 +289,9 @@ class CommitExtraction(Extraction):
                     # filter for current project
                     WHERE p.name = '{project}'
                     AND p.analysisMethod = '{tagging}'
+
+                    # filter duplicated commits
+                    GROUP BY c.commitHash, cd.file, cd.entityId, cd.entityType
 
                     ORDER BY c.authorDate, a.name, c.id, cd.file, cd.entityId
 
@@ -314,7 +318,7 @@ class CommitMessageExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT c.id, c.commitHash, c.description
+                    SELECT MIN(c.id), c.commitHash, c.description
 
                     FROM project p
 
@@ -324,6 +328,9 @@ class CommitMessageExtraction(Extraction):
                     # filter for current project
                     WHERE p.name = '{project}'
                     AND p.analysisMethod = '{tagging}'
+
+                    # filter duplicated commits
+                    GROUP BY c.commitHash
 
                     ORDER BY c.authorDate
                 """
@@ -343,7 +350,7 @@ class FunctionImplementationExtraction(Extraction):
 
         # for subclasses
         self.sql = """
-                    SELECT c.id, c.commitHash,
+                    SELECT MIN(c.id), c.commitHash,
                            cd.file, cd.entityId, cd.impl
 
                     FROM project p
@@ -358,6 +365,9 @@ class FunctionImplementationExtraction(Extraction):
                     WHERE p.name = '{project}'
                     AND p.analysisMethod = '{tagging}'
                     AND cd.file IS NOT NULL
+
+                    # filter duplicated commits
+                    GROUP BY c.commitHash, cd.file, cd.entityId
 
                     ORDER BY cd.file, cd.entityId, c.id, c.commitHash
                 """
@@ -512,6 +522,18 @@ class CommitRangeExtraction(Extraction):
                     AND p.analysisMethod = '{tagging}'
                     AND l2.tag = '{revision}'
 
+                    # remove commits from previous range (each range includes its end)
+                    AND c.commitHash NOT IN (SELECT c2.commitHash
+                                             FROM project p
+                                             JOIN release_range r0 ON r0.projectId = p.id
+                                             JOIN release_range r1 ON r1.projectId = p.id
+                                             JOIN release_timeline l2 ON r1.releaseEndId = l2.id
+                                             JOIN commit c2 ON r0.id = c2.releaseRangeId
+                                             WHERE l2.tag = '{revision}'
+                                             AND r0.releaseEndId = r1.releaseStartId
+                                             AND p.name = '{project}'
+                                             AND p.analysisMethod = '{tagging}' )
+
                     ORDER BY c.authorDate, a.name, c.id, cd.file, cd.entityId
 
                     # LIMIT 10
@@ -558,6 +580,18 @@ class CommitMessageRangeExtraction(Extraction):
                     AND p.analysisMethod = '{tagging}'
                     AND l2.tag = '{revision}'
 
+                    # remove commits from previous range (each range includes its end)
+                    AND c.commitHash NOT IN (SELECT c2.commitHash
+                                             FROM project p
+                                             JOIN release_range r0 ON r0.projectId = p.id
+                                             JOIN release_range r1 ON r1.projectId = p.id
+                                             JOIN release_timeline l2 ON r1.releaseEndId = l2.id
+                                             JOIN commit c2 ON r0.id = c2.releaseRangeId
+                                             WHERE l2.tag = '{revision}'
+                                             AND r0.releaseEndId = r1.releaseStartId
+                                             AND p.name = '{project}'
+                                             AND p.analysisMethod = '{tagging}' )
+
                     ORDER BY c.authorDate
                 """
 
@@ -601,6 +635,20 @@ class EmailRangeExtraction(Extraction):
                     AND p.analysisMethod = '{tagging}'
                     AND l2.tag = '{revision}'
                     AND m.creationDate BETWEEN l1.date AND l2.date
+
+                    # remove e-mails from previous range (each range includes its end)
+                    AND m.messageId NOT IN (SELECT m2.messageId
+                                            FROM project p
+                                            JOIN release_range r0 ON r0.projectId = p.id
+                                            JOIN release_range r1 ON r1.projectId = p.id
+                                            JOIN release_timeline l0 ON r0.releaseStartId = l0.id
+                                            JOIN release_timeline l1 ON r0.releaseEndId = l1.id
+                                            JOIN release_timeline l2 ON r1.releaseEndId = l2.id
+                                            JOIN mail m2 ON m2.creationDate BETWEEN l0.date AND l1.date
+                                            WHERE l2.tag = '{revision}'
+                                            AND r0.releaseEndId = r1.releaseStartId
+                                            AND p.name = '{project}'
+                                            AND p.analysisMethod = '{tagging}' )
 
                     ORDER BY threadId, m.creationDate ASC
 
@@ -647,6 +695,18 @@ class FunctionImplementationRangeExtraction(Extraction):
                     AND p.analysisMethod = '{tagging}'
                     AND l2.tag = '{revision}'
                     AND cd.file IS NOT NULL
+
+                    # remove commits from previous range (each range includes its end)
+                    AND c.commitHash NOT IN (SELECT c2.commitHash
+                                             FROM project p
+                                             JOIN release_range r0 ON r0.projectId = p.id
+                                             JOIN release_range r1 ON r1.projectId = p.id
+                                             JOIN release_timeline l2 ON r1.releaseEndId = l2.id
+                                             JOIN commit c2 ON r0.id = c2.releaseRangeId
+                                             WHERE l2.tag = '{revision}'
+                                             AND r0.releaseEndId = r1.releaseStartId
+                                             AND p.name = '{project}'
+                                             AND p.analysisMethod = '{tagging}' )
 
                     ORDER BY cd.file, cd.entityId, c.id, c.commitHash
                 """
