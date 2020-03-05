@@ -17,6 +17,7 @@
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018-2019 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # Copyright 2019 by Thomas Bock <bockthom@fim.uni-passau.de>
+# Copyright 2020 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # All Rights Reserved.
 """
 This file is able to extract Github issue data from json files.
@@ -161,6 +162,16 @@ def create_user(name, username, email):
     return user
 
 
+def create_deleted_user():
+    """
+    Creates a user object for a deleted user (ghost user)
+
+    :return: the created user object for a deleted user
+    """
+
+    return create_user("Deleted user", "ghost", "ghost@github.com")
+
+
 def lookup_user(user_dict, user):
     """
     Alters a user object in the case that name or email are missing by the corresponding name and email
@@ -171,6 +182,10 @@ def lookup_user(user_dict, user):
     :return: the altered user object in case of a lookup
              or the unaltered user object otherwise
     """
+
+    # if user is None, replace it by a deleted user
+    if user is None:
+        user = create_deleted_user()
 
     if (user["name"] == "" or user["name"] is None or
         user["email"] is None or user["email"] == ""):
@@ -190,6 +205,10 @@ def update_user_dict(user_dict, user):
     :param user: the user object to add to or update in the dictionary
     :return: the updated user dictionary
     """
+
+    # if the given user is None, use the deleted user instead
+    if user is None:
+        user = create_deleted_user()
 
     if not user["username"] in user_dict.keys():
         if not user["username"] is None and not user["username"] == "":
