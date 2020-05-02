@@ -503,7 +503,7 @@ def insert_user_data(issues, conf):
 
     def get_or_update_user(user, buffer_db=user_buffer):
         # fix encoding for name and e-mail address
-        if user["name"] is not None:
+        if user["name"] is not None and user["name"] != "":
             name = unicode(user["name"]).encode("utf-8")
         else:
             name = unicode(user["username"]).encode("utf-8")
