@@ -16,6 +16,7 @@
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018-2019 by Anselm Fehnker <fehnker@fim.uni-passau.de>
+# Copyright 2020 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # All Rights Reserved.
 """
 This file is able to extract Jira issue data from xml files.
@@ -125,7 +126,7 @@ def clear_result_files(results_folder):
 
     # construct list of path to output files
     output_files = [os.path.join(results_folder, "issues-jira.list"), os.path.join(results_folder, "bugs-jira.list"),
-                    os.path.join(results_folder, "issue-jira.list"),
+                    os.path.join(results_folder, "issues.list"),
                     os.path.join(results_folder, "issues-jira-gephi-edges.csv"),
                     os.path.join(results_folder, "issues-jira-gephi-nodes.csv")]
 
