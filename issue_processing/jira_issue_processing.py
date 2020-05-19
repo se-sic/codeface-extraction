@@ -102,10 +102,10 @@ def run():
         issues = insert_user_data(issues, __conf)
         # 5) dump result to disk
         print_to_disk(issues, __resdir)
-        # 6) export for Gephi
-        print_to_disk_gephi(issues, __resdir)
-        # 7) export for jira issue extraction to use them in dev-network-growth
-        print_to_disk_extr(issues, __resdir)
+        # # 6) export for Gephi
+        # print_to_disk_gephi(issues, __resdir)
+        # # 7) export for jira issue extraction to use them in dev-network-growth
+        # print_to_disk_extr(issues, __resdir)
         # 8) dump bug issues to disk
         print_to_disk_bugs(issues, __resdir)
 
