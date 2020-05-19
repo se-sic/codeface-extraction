@@ -16,7 +16,23 @@
 # Copyright 2020 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # All Rights Reserved.
 """
-This file is able to disambiguate authors after the extraction from the Codeface database was performed. A manually created disambiguation file is used to disambiguate the authors in all the extracted files of a project.
+This file is able to disambiguate authors after the extraction from the Codeface database was performed. A manually
+created disambiguation file is used to disambiguate the authors in all the extracted files of a project.
+
+The manually created disambiguation file 'disambiguation-after-db.list' has to have the following format:
+    - each line combines two person identities which should be mapped to each other
+    - each line consists of six columns (each three for describing id, name, e-mail address)
+    - the entries of each line are taken from the global 'authors.list' file
+    - Example:
+        1234;Claus Hunsen;claus.hunsen@example.org;5678;claushunsen;hunsen.claus@example.net;
+    - the first three columns of a line describe the person identity to keep (e.g., 1234)
+    - the last three columns of a line describe the person identity to replace (e.g., 5678)
+Result: Every occurrence of the second person identity will be replaced by the first person identity, in every .list
+file of the project (authors, commits, emails, issues, etc.)
+
+If more than two person identities should be mapped to each other, several lines are necessary in the disambiguation
+file. E.g., if persons A, B, C should be mapped to A, there has to be a line which replaces B by A (A,B) and a line
+which replaces C by A (A,C).
 """
 
 import argparse
@@ -113,7 +129,7 @@ def run_postprocessing(conf, resdir):
 
             for person in disambiguation_data:
                 for author in authors:
-                    # replace author if nessary
+                    # replace author if necessary
                     if person[4] == author[0] and person[5] == author[1]:
                         author[0] = person[1]
                         author[1] = person[2]
