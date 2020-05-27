@@ -37,8 +37,9 @@ which replaces C by A (A,C).
 
 import argparse
 import sys
-from os import path, walk
+from os import path, walk, makedirs
 from os.path import abspath
+from shutil import copy
 
 from codeface.cli import log
 from codeface.configuration import Configuration
@@ -51,15 +52,49 @@ from csv_writer import csv_writer
 # RUN POSTPROCESSING
 ##
 
+def perform_data_backup(results_path, results_path_backup):
+    """
+    Copy the existing .list files of a certain directory (also recursively) to a separate backup folder.
+    If the backup folder already exists, no files are copied, i.e., no backup is performed.
 
-def run_postprocessing(conf, resdir):
+    :param results_path: the results dir, from which the data should be backuped
+    :param results_path_backup: the results dir where the backup should be written to
+    """
+
+    if path.exists(results_path_backup):
+        log.info("Backup folder already exists. No backup is to be performed.")
+        return
+
+    for filepath, dirnames, filenames in walk(results_path):
+        for filename in filenames:
+                if filename.endswith(".list"):
+                    current_file = path.join(filepath, filename)
+                    backup_file = path.join(results_path_backup, filepath[len(results_path)+1:], filename)
+                    if not path.exists(path.dirname(backup_file)):
+                        makedirs(path.dirname(backup_file))
+                    log.info("Backup %s to %s" % (current_file, backup_file))
+                    copy(current_file, backup_file)
+
+
+def run_postprocessing(conf, resdir, backup_data):
     """
     Runs the postprocessing for the given parameters, that is, read the disambiguation file of the project
-    and replace all author names and e-mail addresses in all other .list files according to the disambiguation file
+    and replace all author names and e-mail addresses in all other .list files according to the disambiguation file.
+
+    If backuping the data is enabled, all the .list files of the results dir are copied to a backup results dir
+    (which has the suffix '_bak'). If this backkup results dir already exists, no backup is performed.
 
     :param conf: the Codeface configuration object
     :param resdir: the Codeface results dir, where output files are written
+    :param backup_data: whether to backup the current .list files before performing the postprocessing
     """
+
+    if backup_data:
+        log.info("%s: Backup current data" % conf["project"])
+        results_path = path.join(resdir, conf["project"], conf["tagging"])
+        results_path_backup = path.join(resdir, conf["project"], conf["tagging"] + "_bak")
+        perform_data_backup(results_path, results_path_backup)
+        log.info("%s: Backup of current data complete!" % conf["project"])
 
     log.info("%s: Postprocess authors after manual disambiguation" % conf["project"])
 
@@ -207,6 +242,8 @@ def get_parser():
                             default='codeface.conf')
     run_parser.add_argument('-p', '--project', help="Project configuration file",
                             required=True)
+    run_parser.add_argument('-b', '--backup', action='store_true',
+                            help="Backup the current .list files bevore performing the postprocessing")
     run_parser.add_argument('resdir',
                             help="Directory to store analysis results in")
 
@@ -222,11 +259,12 @@ def run():
     # - First make all the args absolute
     __resdir = abspath(args.resdir)
     __codeface_conf, __project_conf = map(abspath, (args.config, args.project))
+    __backup_data = args.backup
 
     # load configuration
     __conf = Configuration.load(__codeface_conf, __project_conf)
 
-    run_postprocessing(__conf, __resdir)
+    run_postprocessing(__conf, __resdir, __backup_data)
 
 
 if __name__ == '__main__':
