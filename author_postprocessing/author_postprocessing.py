@@ -87,111 +87,111 @@ def run_postprocessing(conf, resdir):
         if authors_list in filenames:
             f = path.join(filepath, authors_list)
             log.info("Postprocess %s ...", f)
-            authors = csv_writer.read_from_csv(f)
+            author_data = csv_writer.read_from_csv(f)
 
-            authors_to_remove = []
-            authors_new = []
+            author_data_to_remove = []
+            author_data_new = []
 
             # get persons which should be removed
             for person in disambiguation_data:
-                authors_to_remove.append([person[3], person[4], person[5]])
+                author_data_to_remove.append([person[3], person[4], person[5]])
 
-            for author in authors:
+            for author in author_data:
                 # keep author entry only if it should not be removed
-                if not author in authors_to_remove:
-                    authors_new.append(author)
-            csv_writer.write_to_csv(f, authors_new)
+                if not author in author_data_to_remove:
+                    author_data_new.append(author)
+            csv_writer.write_to_csv(f, author_data_new)
 
         # (2) Adjust commits lists
         if commits_list in filenames:
             f = path.join(filepath, commits_list)
             log.info("Postprocess %s ...", f)
-            authors = csv_writer.read_from_csv(f)
+            commit_data = csv_writer.read_from_csv(f)
 
             for person in disambiguation_data:
-                for author in authors:
+                for commit in commit_data:
                     # replace author if necessary
-                    if person[4] == author[2] and person[5] == author[3]:
-                        author[2] = person[1]
-                        author[3] = person[2]
+                    if person[4] == commit[2] and person[5] == commit[3]:
+                        commit[2] = person[1]
+                        commit[3] = person[2]
                     # replace committer if necessary
-                    if person[4] == author[5] and person[5] == author[6]:
-                        author[5] = person[1]
-                        author[6] = person[2]
+                    if person[4] == commit[5] and person[5] == commit[6]:
+                        commit[5] = person[1]
+                        commit[6] = person[2]
 
-            csv_writer.write_to_csv(f, authors)
+            csv_writer.write_to_csv(f, commit_data)
 
         # (3) Adjust emails lists
         if emails_list in filenames:
             f = path.join(filepath, emails_list)
             log.info("Postprocess %s ...", f)
-            authors = csv_writer.read_from_csv(f)
+            email_data = csv_writer.read_from_csv(f)
 
             for person in disambiguation_data:
-                for author in authors:
+                for email in email_data:
                     # replace author if necessary
-                    if person[4] == author[0] and person[5] == author[1]:
-                        author[0] = person[1]
-                        author[1] = person[2]
+                    if person[4] == email[0] and person[5] == email[1]:
+                        email[0] = person[1]
+                        email[1] = person[2]
 
-            csv_writer.write_to_csv(f, authors)
+            csv_writer.write_to_csv(f, email_data)
 
         # (4) Adjust issues lists (github)
         if issues_github_list in filenames:
             f = path.join(filepath, issues_github_list)
             log.info("Postprocess %s ...", f)
-            authors = csv_writer.read_from_csv(f)
+            issue_data = csv_writer.read_from_csv(f)
 
             for person in disambiguation_data:
-                for author in authors:
+                for issue_event in issue_data:
                     # replace author if necessary
-                    if person[4] == author[9] and person[5] == author[10]:
-                        author[9] = person[1]
-                        author[10] = person[2]
+                    if person[4] == issue_event[9] and person[5] == issue_event[10]:
+                        issue_event[9] = person[1]
+                        issue_event[10] = person[2]
                     # replace person in event info 1/2 if necessary
-                    if person[4] == author[12] and person[5] == author[13]:
-                        author[12] = person[1]
-                        author[13] = person[2]
+                    if person[4] == issue_event[12] and person[5] == issue_event[13]:
+                        issue_event[12] = person[1]
+                        issue_event[13] = person[2]
 
-            csv_writer.write_to_csv(f, authors)
+            csv_writer.write_to_csv(f, issue_data)
 
         # (5) Adjust issues lists (jira)
         if issues_jira_list in filenames:
             f = path.join(filepath, issues_jira_list)
             log.info("Postprocess %s ...", f)
-            authors = csv_writer.read_from_csv(f)
+            issue_data = csv_writer.read_from_csv(f)
 
             for person in disambiguation_data:
-                for author in authors:
+                for issue_event in issue_data:
                     # replace author if necessary
-                    if person[4] == author[9] and person[5] == author[10]:
-                        author[9] = person[1]
-                        author[10] = person[2]
+                    if person[4] == issue_event[9] and person[5] == issue_event[10]:
+                        issue_event[9] = person[1]
+                        issue_event[10] = person[2]
                     # replace person in event info 1/2 if necessary
-                    if person[4] == author[12] and person[5] == author[13]:
-                        author[12] = person[1]
-                        author[13] = person[2]
+                    if person[4] == issue_event[12] and person[5] == issue_event[13]:
+                        issue_event[12] = person[1]
+                        issue_event[13] = person[2]
 
-            csv_writer.write_to_csv(f, authors)
+            csv_writer.write_to_csv(f, issue_data)
 
         # (6) Adjust bugs lists (jira)
         if bugs_jira_list in filenames:
             f = path.join(filepath, bugs_jira_list)
             log.info("Postprocess %s ...", f)
-            authors = csv_writer.read_from_csv(f)
+            bug_data = csv_writer.read_from_csv(f)
 
             for person in disambiguation_data:
-                for author in authors:
+                for bug_event in bug_data:
                     # replace author if necessary
-                    if person[4] == author[9] and person[5] == author[10]:
-                        author[9] = person[1]
-                        author[10] = person[2]
+                    if person[4] == bug_event[9] and person[5] == bug_event[10]:
+                        bug_event[9] = person[1]
+                        bug_event[10] = person[2]
                     # replace person in event info 1/2 if necessary
-                    if person[4] == author[12] and person[5] == author[13]:
-                        author[12] = person[1]
-                        author[13] = person[2]
+                    if person[4] == bug_event[12] and person[5] == bug_event[13]:
+                        bug_event[12] = person[1]
+                        bug_event[13] = person[2]
 
-            csv.writer.write_to_csv(f, authors)
+            csv.writer.write_to_csv(f, bug_data)
 
     log.info("Postprocessing complete!")
 
