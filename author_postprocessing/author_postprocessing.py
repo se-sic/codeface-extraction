@@ -101,7 +101,7 @@ def run_postprocessing(conf, resdir, backup_data):
     authors_list = "authors.list"
     commits_list = "commits.list"
     emails_list = "emails.list"
-    issues_github_list = "issues-github.lisst"
+    issues_github_list = "issues-github.list"
     issues_jira_list = "issues-jira.list"
     bugs_jira_list = "bugs-jira.list"
 
