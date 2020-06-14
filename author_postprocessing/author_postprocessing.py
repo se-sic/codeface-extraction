@@ -226,7 +226,7 @@ def run_postprocessing(conf, resdir, backup_data):
                         bug_event[12] = person[1]
                         bug_event[13] = person[2]
 
-            csv.writer.write_to_csv(f, bug_data)
+            csv_writer.write_to_csv(f, bug_data)
 
     log.info("Postprocessing complete!")
 
