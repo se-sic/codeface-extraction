@@ -558,7 +558,7 @@ def insert_user_data(issues, conf):
         # check database for event authors
         for comment in issue["comments"]:
             comment["author"] = get_id_and_update_user(comment["author"])
-            ## check database for the reference-target user if needed
+            # # check database for the reference-target user if needed
             # if event["ref_target"] != "":
             #     event["ref_target"] = get_id_and_update_user(event["ref_target"])
 
@@ -570,7 +570,7 @@ def insert_user_data(issues, conf):
         # get event authors
         for comment in issue["comments"]:
             comment["author"] = get_user_from_id(comment["author"])
-            ## get the reference-target user if needed
+            # # get the reference-target user if needed
             # if event["ref_target"] != "":
             #     event["ref_target"] = get_user_from_id(event["ref_target"])
 
