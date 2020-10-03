@@ -662,8 +662,10 @@ def insert_user_data(issues, conf):
 
     log.info("Syncing users with ID service...")
 
-    # create buffer for users
+    # create buffer for users (key: user id)
     user_buffer = dict()
+    # create buffer for user ids (key: user string)
+    user_id_buffer = dict()
     # open database connection
     dbm = DBManager(conf)
     # open ID-service connection
@@ -676,7 +678,7 @@ def insert_user_data(issues, conf):
         else:
             return "{name} <{email}>".format(name=name, email=email)
 
-    def get_or_update_user(user, buffer_db=user_buffer):
+    def get_id_and_update_user(user, buffer_db_ids=user_id_buffer):
         # fix encoding for name and e-mail address
         if user["name"] is not None:
             name = unicode(user["name"]).encode("utf-8")
@@ -687,38 +689,66 @@ def insert_user_data(issues, conf):
         user_string = get_user_string(name, mail)
 
         # check buffer to reduce amount of DB queries
-        if user_string in buffer_db:
-            log.devinfo("Returning user '{}' from buffer.".format(user_string))
-            return buffer_db[user_string]
+        if user_string in buffer_db_ids:
+            log.devinfo("Returning person id for user '{}' from buffer.".format(user_string))
+            return buffer_db_ids[user_string]
 
         # get person information from ID service
         log.devinfo("Passing user '{}' to ID service.".format(user_string))
         idx = idservice.getPersonID(user_string)
 
-        # update user data with person information from DB
+        # add user information to buffer
+        # user_string = get_user_string(user["name"], user["email"]) # update for
+        buffer_db_ids[user_string] = idx
+
+        return idx
+
+    def get_user_from_id(idx, buffer_db=user_buffer):
+
+        # check whether user information is in buffer to reduce amount of DB queries
+        if idx in buffer_db:
+            log.devinfo("Returning user '{}' from buffer.".format(idx))
+            return buffer_db[idx]
+
+        # get person information from ID service
+        log.devinfo("Passing user id '{}' to ID service.".format(idx))
         person = idservice.getPersonFromDB(idx)
+        user = dict()
         user["email"] = person["email1"]  # column "email1"
         user["name"] = person["name"]  # column "name"
         user["id"] = person["id"]  # column "id"
 
         # add user information to buffer
-        # user_string = get_user_string(user["name"], user["email"]) # update for
-        buffer_db[user_string] = user
+        buffer_db[idx] = user
 
         return user
 
+
+    # check and update database for all occurring users
     for issue in issues:
         # check database for issue author
-        issue["user"] = get_or_update_user(issue["user"])
+        issue["user"] = get_id_and_update_user(issue["user"])
 
         # check database for event authors
         for event in issue["eventsList"]:
-            # get the event user from the DB
-            event["user"] = get_or_update_user(event["user"])
+            event["user"] = get_id_and_update_user(event["user"])
 
-            # get the reference-target user from the DB if needed
+            # check database for the reference-target user if needed
             if event["ref_target"] != "":
-                event["ref_target"] = get_or_update_user(event["ref_target"])
+                event["ref_target"] = get_id_and_update_user(event["ref_target"])
+
+    # get all users after database updates having been performed
+    for issue in issues:
+        # get issue author
+        issue["user"] = get_user_from_id(issue["user"])
+
+        # get event authors
+        for event in issue["eventsList"]:
+            event["user"] = get_user_from_id(event["user"])
+
+            # get the reference-target user if needed
+            if event["ref_target"] != "":
+                event["ref_target"] = get_user_from_id(event["ref_target"])
                 event["event_info_1"] = event["ref_target"]["name"]
                 event["event_info_2"] = event["ref_target"]["email"]
 

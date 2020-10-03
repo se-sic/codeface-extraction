@@ -488,8 +488,10 @@ def insert_user_data(issues, conf):
 
     log.info("Syncing users with ID service...")
 
-    # create buffer for users
+    # create buffer for users (key: user id)
     user_buffer = dict()
+    # create buffer for user ids (key: user string)
+    user_id_buffer = dict()
     # open database connection
     dbm = DBManager(conf)
     # open ID-service connection
@@ -502,7 +504,7 @@ def insert_user_data(issues, conf):
         else:
             return "{name} <{email}>".format(name=name, email=email)
 
-    def get_or_update_user(user, buffer_db=user_buffer):
+    def get_id_and_update_user(user, buffer_db_ids=user_id_buffer):
         # fix encoding for name and e-mail address
         if user["name"] is not None and user["name"] != "":
             name = unicode(user["name"]).encode("utf-8")
@@ -513,37 +515,64 @@ def insert_user_data(issues, conf):
         user_string = get_user_string(name, mail)
 
         # check buffer to reduce amount of DB queries
-        if user_string in buffer_db:
-            log.devinfo("Returning user '{}' from buffer.".format(user_string))
-            return buffer_db[user_string]
+        if user_string in buffer_db_ids:
+            log.devinfo("Returning person id for user '{}' from buffer.".format(user_string))
+            return buffer_db_ids[user_string]
 
         # get person information from ID service
         log.devinfo("Passing user '{}' to ID service.".format(user_string))
         idx = idservice.getPersonID(user_string)
 
-        # update user data with person information from DB
+        # add user information to buffer
+        # user_string = get_user_string(user["name"], user["email"]) # update for
+        buffer_db_ids[user_string] = idx
+
+        return idx
+
+    def get_user_from_id(idx, buffer_db=user_buffer):
+
+        # check whether user information is in buffer to reduce amount of DB queries
+        if idx in buffer_db:
+            log.devinfo("Returning user '{}' from buffer.".format(idx))
+            return buffer_db[idx]
+
+        # get person information from ID service
+        log.devinfo("Passing user id '{}' to ID service.".format(idx))
         person = idservice.getPersonFromDB(idx)
+        user = dict()
         user["email"] = person["email1"]  # column "email1"
         user["name"] = person["name"]  # column "name"
         user["id"] = person["id"]  # column "id"
 
         # add user information to buffer
-        # user_string = get_user_string(user["name"], user["email"]) # update for
-        buffer_db[user_string] = user
+        buffer_db[idx] = user
 
         return user
 
+
+    # check and update database for all occurring users
     for issue in issues:
         # check database for issue author
-        issue["author"] = get_or_update_user(issue["author"])
+        issue["author"] = get_id_and_update_user(issue["author"])
 
         # check database for event authors
         for comment in issue["comments"]:
-            # get the event user from the DB
-            comment["author"] = get_or_update_user(comment["author"])
-            ## get the reference-target user from the DB if needed
+            comment["author"] = get_id_and_update_user(comment["author"])
+            ## check database for the reference-target user if needed
             # if event["ref_target"] != "":
-            #   event["ref_target"] = get_or_update_user(event["ref_target"])
+            #     event["ref_target"] = get_id_and_update_user(event["ref_target"])
+
+    # get all users after database updates having been performed
+    for issue in issues:
+        # get issue author
+        issue["author"] = get_user_from_id(issue["author"])
+
+        # get event authors
+        for comment in issue["comments"]:
+            comment["author"] = get_user_from_id(comment["author"])
+            ## get the reference-target user if needed
+            # if event["ref_target"] != "":
+            #     event["ref_target"] = get_user_from_id(event["ref_target"])
 
     log.debug("number of issues after insert_user_data: '{}'".format(len(issues)))
     return issues
