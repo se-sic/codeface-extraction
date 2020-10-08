@@ -105,6 +105,9 @@ def run_postprocessing(conf, resdir, backup_data):
     issues_jira_list = "issues-jira.list"
     bugs_jira_list = "bugs-jira.list"
 
+    # When looking at elements originating from json lists, we need to consider quotation marks around the string
+    quot_m = "\""
+
     disambiguation_list = path.join(resdir, conf["project"], conf["tagging"], "disambiguation-after-db.list")
 
     # Check if a disambiguation list exists - if not, just stop
@@ -184,9 +187,9 @@ def run_postprocessing(conf, resdir, backup_data):
                         issue_event[9] = person[1]
                         issue_event[10] = person[2]
                     # replace person in event info 1/2 if necessary
-                    if person[4] == issue_event[12] and person[5] == issue_event[13]:
+                    if person[4] == issue_event[12] and (quot_m + person[5] + quot_m) == issue_event[13]:
                         issue_event[12] = person[1]
-                        issue_event[13] = person[2]
+                        issue_event[13] = quot_m + person[2] + quot_m
 
             csv_writer.write_to_csv(f, issue_data)
 
@@ -203,9 +206,9 @@ def run_postprocessing(conf, resdir, backup_data):
                         issue_event[9] = person[1]
                         issue_event[10] = person[2]
                     # replace person in event info 1/2 if necessary
-                    if person[4] == issue_event[12] and person[5] == issue_event[13]:
+                    if person[4] == issue_event[12] and (quot_m + person[5] + quot_m) == issue_event[13]:
                         issue_event[12] = person[1]
-                        issue_event[13] = person[2]
+                        issue_event[13] = quot_m + person[2] + quot_m
 
             csv_writer.write_to_csv(f, issue_data)
 
@@ -222,9 +225,9 @@ def run_postprocessing(conf, resdir, backup_data):
                         bug_event[9] = person[1]
                         bug_event[10] = person[2]
                     # replace person in event info 1/2 if necessary
-                    if person[4] == bug_event[12] and person[5] == bug_event[13]:
+                    if person[4] == bug_event[12] and (quot_m + person[5] + quot_m)  == bug_event[13]:
                         bug_event[12] = person[1]
-                        bug_event[13] = person[2]
+                        bug_event[13] = quot_m + person[2] + quot_m
 
             csv_writer.write_to_csv(f, bug_data)
 
