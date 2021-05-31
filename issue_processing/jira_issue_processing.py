@@ -41,10 +41,14 @@ from codeface.dbmanager import DBManager
 from csv_writer import csv_writer
 
 from jira import JIRA
+from time import sleep
 
 reload(sys)
 sys.setdefaultencoding("utf-8")
 
+# global counter for JIRA requests to make sure to not exceed the request limit
+jira_request_counter = 0
+max_requests = 45000 # 50,000 JIRA requests per 24 hours are allowed
 
 def run():
     # get all needed paths and argument for the method call.
@@ -110,6 +114,7 @@ def run():
         print_to_disk_bugs(issues, __resdir)
 
     log.info("Jira issue processing complete!")
+    log.info("In total, " + str(jira_request_counter) + " requests have been sent to Jira.")
 
     if incorrect_files:
         log.info("Following files where malformed or not existing:: " + str(incorrect_files))
@@ -319,7 +324,12 @@ def parse_xml(issue_data, persons, skip_history):
             created = comment_x.attributes["created"].value
             comment["changeDate"] = format_time(created)
 
-            comment["text"] = comment_x.firstChild.data
+            text = comment_x.firstChild
+            if text is None:
+                log.warn("Empty comment in issue " + issue["id"])
+                comment["text"] = ""
+            else:
+                comment["text"] = text.data
             comment["issueId"] = issue["id"]
             comments.append(comment)
 
@@ -365,8 +375,20 @@ def load_issue_via_api(issues, persons, url):
     log.info("Load issue information via api...")
     jira_project = JIRA(url)
 
+    global jira_request_counter
+
     for issue in issues:
 
+        # if the number of JIRA requests has reached the request limit, wait 24 hours
+        if jira_request_counter > max_requests:
+            log.info("More than " + str(max_requests) + " JIRA requests have already been sent. Wait for 24 hours...")
+            sleep(86500) # 60 * 60 * 24 = 86400
+            log.info("Reset JIRA request counter and proceed...")
+            jira_request_counter = 0
+
+        # send JIRA request for current issues and increase request counter
+        jira_request_counter += 1
+        log.info("JIRA request counter: " + str(jira_request_counter))
         api_issue = jira_project.issue(issue["externalId"], expand="changelog")
         changelog = api_issue.changelog
         histories = list()
@@ -398,7 +420,11 @@ def load_issue_via_api(issues, persons, url):
                     history["event"] = "state_updated"
                     history["event_info_1"] = new_state
                     history["event_info_2"] = old_state
-                    user = create_user(change.author.name, change.author.name, "")
+                    if hasattr(change, "author"):
+                        user = create_user(change.author.name, change.author.name, "")
+                    else:
+                        log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
+                        user = create_user("","","")
                     history["author"] = merge_user_with_user_from_csv(user, persons)
                     history["date"] = format_time(change.created)
                     histories.append(history)
@@ -414,7 +440,11 @@ def load_issue_via_api(issues, persons, url):
                     history["event"] = "resolution_updated"
                     history["event_info_1"] = new_resolution
                     history["event_info_2"] = old_resolution
-                    user = create_user(change.author.name, change.author.name, "")
+                    if hasattr(change, "author"):
+                        user = create_user(change.author.name, change.author.name, "")
+                    else:
+                        log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
+                        user = create_user("","","")
                     history["author"] = merge_user_with_user_from_csv(user, persons)
                     history["date"] = format_time(change.created)
                     histories.append(history)
