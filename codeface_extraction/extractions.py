@@ -750,6 +750,9 @@ def fix_name_encoding(name):
     :return: unicode string of the name (correctly encoded)
     """
 
+    if name is None:
+        return name
+
     # encode utf-8
     name = name.encode('utf-8')
 
