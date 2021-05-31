@@ -415,7 +415,11 @@ def load_issue_via_api(issues, persons, url):
                     history["event"] = "state_updated"
                     history["event_info_1"] = new_state
                     history["event_info_2"] = old_state
-                    user = create_user(change.author.name, change.author.name, "")
+                    if hasattr(change, "author"):
+                        user = create_user(change.author.name, change.author.name, "")
+                    else:
+                        log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
+                        user = create_user("","","")
                     history["author"] = merge_user_with_user_from_csv(user, persons)
                     history["date"] = format_time(change.created)
                     histories.append(history)
@@ -431,7 +435,11 @@ def load_issue_via_api(issues, persons, url):
                     history["event"] = "resolution_updated"
                     history["event_info_1"] = new_resolution
                     history["event_info_2"] = old_resolution
-                    user = create_user(change.author.name, change.author.name, "")
+                    if hasattr(change, "author"):
+                        user = create_user(change.author.name, change.author.name, "")
+                    else:
+                        log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
+                        user = create_user("","","")
                     history["author"] = merge_user_with_user_from_csv(user, persons)
                     history["date"] = format_time(change.created)
                     histories.append(history)
