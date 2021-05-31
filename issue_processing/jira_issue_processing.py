@@ -324,7 +324,12 @@ def parse_xml(issue_data, persons, skip_history):
             created = comment_x.attributes["created"].value
             comment["changeDate"] = format_time(created)
 
-            comment["text"] = comment_x.firstChild.data
+            text = comment_x.firstChild
+            if text is None:
+                log.warn("Empty comment in issue " + issue["id"])
+                comment["text"] = ""
+            else:
+                comment["text"] = text.data
             comment["issueId"] = issue["id"]
             comments.append(comment)
 
