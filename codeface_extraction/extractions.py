@@ -14,7 +14,7 @@
 #
 # Copyright 2015-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2016, 2018-2019 by Thomas Bock <bockthom@fim.uni-passau.de>
-# Copyright 2019 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2019, 2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018 by Tina Schuh <schuht@fim.uni-passau.de>
 # All Rights Reserved.
