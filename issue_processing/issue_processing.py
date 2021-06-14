@@ -17,7 +17,7 @@
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018-2019 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # Copyright 2019 by Thomas Bock <bockthom@fim.uni-passau.de>
-# Copyright 2020 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2020-2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # All Rights Reserved.
 """
 This file is able to extract Github issue data from json files.
@@ -80,7 +80,7 @@ def run():
     # 4) re-format the eventsList of the issues
     issues = reformat_events(issues)
     # 5) update user data with Codeface database
-    issues = insert_user_data(issues, __conf)
+    issues = insert_user_data(issues, __conf, __srcdir)
     # 6) dump result to disk
     print_to_disk(issues, __resdir)
 
@@ -651,12 +651,14 @@ def reformat_events(issue_data):
     return issue_data
 
 
-def insert_user_data(issues, conf):
+def insert_user_data(issues, conf, srcdir):
     """
-    Insert user data into database ad update issue data.
+    Insert user data into database and update issue data.
+    In addition, dump username-to-user list to file.
 
     :param issues: the issues to retrieve user data from
     :param conf: the project configuration
+    :param srcdir: the directory at which the username-to-user list should be dumped
     :return: the updated issue data
     """
 
@@ -666,6 +668,8 @@ def insert_user_data(issues, conf):
     user_buffer = dict()
     # create buffer for user ids (key: user string)
     user_id_buffer = dict()
+    # create buffer for usernames (key: username)
+    username_id_buffer = dict()
     # open database connection
     dbm = DBManager(conf)
     # open ID-service connection
@@ -678,12 +682,14 @@ def insert_user_data(issues, conf):
         else:
             return "{name} <{email}>".format(name=name, email=email)
 
-    def get_id_and_update_user(user, buffer_db_ids=user_id_buffer):
+    def get_id_and_update_user(user, buffer_db_ids=user_id_buffer, buffer_usernames=username_id_buffer):
+        username = unicode(user["username"]).encode("utf-8")
+
         # fix encoding for name and e-mail address
         if user["name"] is not None:
             name = unicode(user["name"]).encode("utf-8")
         else:
-            name = unicode(user["username"]).encode("utf-8")
+            name = username
         mail = unicode(user["email"]).encode("utf-8")
         # construct string for ID service and send query
         user_string = get_user_string(name, mail)
@@ -691,6 +697,8 @@ def insert_user_data(issues, conf):
         # check buffer to reduce amount of DB queries
         if user_string in buffer_db_ids:
             log.devinfo("Returning person id for user '{}' from buffer.".format(user_string))
+            if username is not None:
+                buffer_usernames[username] = buffer_db_ids[user_string]
             return buffer_db_ids[user_string]
 
         # get person information from ID service
@@ -700,6 +708,10 @@ def insert_user_data(issues, conf):
         # add user information to buffer
         # user_string = get_user_string(user["name"], user["email"]) # update for
         buffer_db_ids[user_string] = idx
+
+        # add id to username buffer
+        if username is not None:
+            buffer_usernames[username] = idx
 
         return idx
 
@@ -752,17 +764,29 @@ def insert_user_data(issues, conf):
                 event["event_info_1"] = event["ref_target"]["name"]
                 event["event_info_2"] = event["ref_target"]["email"]
 
+    # dump username, name, and e-mail to file
+    lines = []
+    for username in username_id_buffer:
+        user = get_user_from_id(username_id_buffer[username])
+        lines.append((
+            username,
+            user["name"],
+            user["email"]
+        ))
+
+    log.info("Dump username list to file...")
+    username_dump = os.path.join(srcdir, "usernames.list")
+    csv_writer.write_to_csv(username_dump, sorted(set(lines), key=lambda line: line[0]))
+
     return issues
 
 
 def print_to_disk(issues, results_folder):
     """
-    Print issues to file "issues.list" in result folder.
-    This format is outdated but still used by the network library.
-    TODO When the network library is updated, this method can be overwritten by "print_to_disk_new".
+    Print issues to file "issues-github.list" in the results folder.
 
     :param issues: the issues to dump
-    :param results_folder: the folder where to place "issues.list" output file
+    :param results_folder: the folder where to place "issues-github.list" output file
     """
 
     # construct path to output file

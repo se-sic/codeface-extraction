@@ -706,7 +706,7 @@ def print_to_disk(issues, results_folder):
 def print_to_disk_bugs(issues, results_folder):
     """
     Sorts of bug issues and prints them to file "bugs-jira.list" in result folder
-    This method prints in a new format which is consistent to the format of "print_to_disk_new" in "issue_processing.py".
+    This method prints in a format which is consistent to the format of "print_to_disk" in "issue_processing.py".
 
     :param issues: the issues to sort of bugs
     :param results_folder: the folder where to place "bugs-jira.list" output file
