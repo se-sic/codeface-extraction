@@ -13,7 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2015-2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
-# Copyright 2020 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2020-2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # All Rights Reserved.
 """
 This file is able to disambiguate authors after the extraction from the Codeface database was performed. A manually
@@ -104,6 +104,7 @@ def run_postprocessing(conf, resdir, backup_data):
     issues_github_list = "issues-github.list"
     issues_jira_list = "issues-jira.list"
     bugs_jira_list = "bugs-jira.list"
+    bots_list = "bots.list"
 
     # When looking at elements originating from json lists, we need to consider quotation marks around the string
     quot_m = "\""
@@ -120,7 +121,7 @@ def run_postprocessing(conf, resdir, backup_data):
 
     # Check for all files in the result directory of the project whether they need to be adjusted
     for filepath, dirnames, filenames in walk(path.join(resdir, conf["project"], conf["tagging"])):
-        
+
         # (1) Adjust authors lists
         if authors_list in filenames:
             f = path.join(filepath, authors_list)
@@ -230,6 +231,21 @@ def run_postprocessing(conf, resdir, backup_data):
                         bug_event[13] = quot_m + person[2] + quot_m
 
             csv_writer.write_to_csv(f, bug_data)
+
+        # (7) Adjust bots list
+        if bots_list in filenames:
+            f = path.join(filepath, bots_list)
+            log.info("Postprocess %s ...", f)
+            bot_data = csv_writer.read_from_csv(f)
+
+            for person in disambiguation_data:
+                for bot in bot_data:
+                    # replace author if necessary
+                    if person[4] == bot[0] and person[5] == bot[1]:
+                        bot[0] = person[1]
+                        bot[1] = person[2]
+
+            csv_writer.write_to_csv(f, bot_data)
 
     log.info("Postprocessing complete!")
 
