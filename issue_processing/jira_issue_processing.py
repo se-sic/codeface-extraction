@@ -51,7 +51,7 @@ jira_request_counter = 0
 max_requests = 45000 # 50,000 JIRA requests per 24 hours are allowed
 
 def run():
-    # get all needed paths and argument for the method call.
+    # get all needed paths and arguments for the method call.
     parser = argparse.ArgumentParser(prog="codeface-extraction-issues-jira", description="Codeface extraction")
     parser.add_argument("-c", "--config", help="Codeface configuration file", default="codeface.conf")
     parser.add_argument("-p", "--project", help="Project configuration file", required=True)

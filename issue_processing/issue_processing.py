@@ -53,7 +53,7 @@ known_resolutions = {"unresolved", "fixed", "wontfix", "duplicate", "invalid", "
 datetime_format = "%Y-%m-%d %H:%M:%S"
 
 def run():
-    # get all needed paths and argument for the method call.
+    # get all needed paths and arguments for the method call.
     parser = argparse.ArgumentParser(prog='codeface-extraction-issues-github', description='Codeface extraction')
     parser.add_argument('-c', '--config', help="Codeface configuration file", default='codeface.conf')
     parser.add_argument('-p', '--project', help="Project configuration file", required=True)
@@ -658,7 +658,7 @@ def insert_user_data(issues, conf, srcdir):
 
     :param issues: the issues to retrieve user data from
     :param conf: the project configuration
-    :param srcdir: the directory at which the username-to-user list should be dumped
+    :param srcdir: the directory in which the username-to-user list should be dumped
     :return: the updated issue data
     """
 
