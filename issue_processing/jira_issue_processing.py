@@ -102,7 +102,13 @@ def run():
         if not args.skip_history:
             load_issue_via_api(issues, persons, __conf["issueTrackerURL"])
         # 4) update user data with Codeface database
-        # mabye not nessecary
+        #    ATTENTION: As the database update is performed for every iteration in this for loop, but the current issue
+        #    data is appended to the results file immediately, the database updates from the later iterations are not
+        #    respected in the previously dumped issues from the previous iterations. However, as we don't get email
+        #    data from JIRA, this is currently not a problem, as no names will change in the database if we don't
+        #    provide emails. If JIRA will provide email data in the future, this implementation needs to be adjusted
+        #    in such a way that users in issue data of all iterations are updated in the end and dumped afterwards,
+        #    instead of dumping the intermediate issue data immediately.
         issues = insert_user_data(issues, __conf)
         # 5) dump result to disk
         print_to_disk(issues, __resdir)
@@ -509,7 +515,7 @@ def load_issue_via_api(issues, persons, url):
 
 def insert_user_data(issues, conf):
     """
-    Insert user data into database ad update issue data.
+    Insert user data into database and update issue data.
 
     :param issues: the issues to retrieve user data from
     :param conf: the project configuration
