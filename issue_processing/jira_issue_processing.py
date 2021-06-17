@@ -213,18 +213,29 @@ def merge_user_with_user_from_csv(user, persons):
     merges list of given users with list of already known users
 
     :param user: list of users to be merged
-    :param persons: list of persons from JIRA (incl. e-mail addresses)
+    :param persons: contains maps of names/usernames to persons from JIRA (incl. e-mail addresses),
+                    see function "load_csv"
     :return: list of merged users
     """
 
     new_user = dict()
-    if user["username"].lower() in persons.keys():
-        new_user["username"] = unicode(user["username"].lower()).encode("utf-8")
-        new_user["name"] = unicode(persons.get(user["username"].lower())[0]).encode("utf-8")
-        new_user["email"] = unicode(persons.get(user["username"].lower())[1]).encode("utf-8")
+    name_utf8 = unicode(user["name"]).encode("utf-8")
+    username_utf8 = unicode(user["username"].lower()).encode("utf-8")
+
+    if username_utf8 in persons["by_username"].keys():
+        new_user["username"] = username_utf8
+        new_user["name"] = unicode(persons["by_username"].get(username_utf8)[0]).encode("utf-8")
+        new_user["email"] = unicode(persons["by_username"].get(username_utf8)[1]).encode("utf-8")
+    elif name_utf8 in persons["by_name"].keys():
+        new_user["username"] = username_utf8
+        new_user["name"] = unicode(persons["by_name"].get(name_utf8)[0]).encode("utf-8")
+        new_user["email"] = unicode(persons["by_name"].get(name_utf8)[1]).encode("utf-8")
     else:
-        new_user = user
+        new_user["username"] = username_utf8
+        new_user["name"] = name_utf8
+        new_user["email"] = unicode(user["email"]).encode("utf-8")
         log.warning("User not in csv-file: " + str(user))
+
     log.info("current User: " + str(user) + ",    new user: " + str(new_user))
     return new_user
 
@@ -234,7 +245,7 @@ def parse_xml(issue_data, persons, skip_history):
     Parse issues from the xml-data
 
     :param issue_data: list of xml-files
-    :param persons: list of persons from JIRA (incl. e-mail addresses)
+    :param persons: list of persons from JIRA (incl. e-mail addresses), see function "load_csv"
     :param skip_history: flag if the history will be loaded in a different method
     :return: list of parsed issues
     """
@@ -374,7 +385,7 @@ def load_issue_via_api(issues, persons, url):
     For each issue in the list the history is added via the api
 
         :param issues: list of issues
-        :param persons: list of persons from JIRA (incl. e-mail addresses)
+        :param persons: list of persons from JIRA (incl. e-mail addresses), see function "load_csv"
         :param url: the project url
     """
 
@@ -912,7 +923,8 @@ def load_csv(source_folder):
     Load persons from disk.
 
     :param source_folder: the folder where to find .csv-file
-    :return: the loaded person data
+    :return: the loaded person data contained in a dict consisting of two maps:
+             keys are either name ("by_name") or username ("by_username"), values are name-email pairs
     """
 
     def find_first_existing(source_folder, filenames):
@@ -947,9 +959,17 @@ def load_csv(source_folder):
     log.devinfo("Loading person csv from file '{}'...".format(srcfile))
     with open(srcfile, "r") as f:
         person_data = csv.DictReader(f, delimiter=",", skipinitialspace=True)
-        persons = {}
+        persons_by_username = {}
+        persons_by_name = {}
         for row in person_data:
-            if not row["AuthorID"] in persons.keys():
-                persons[row["AuthorID"]] = (row["AuthorName"], row["userEmail"])
+            if not row["AuthorID"] in persons_by_username.keys():
+                author_id_utf8 = unicode(row["AuthorID"]).encode("utf-8")
+                persons_by_username[author_id_utf8] = (row["AuthorName"], row["userEmail"])
+            if not row["AuthorName"] in persons_by_name.keys():
+                author_name_utf8 = unicode(row["AuthorName"]).encode("utf-8")
+                persons_by_name[author_name_utf8] = (row["AuthorName"], row["userEmail"])
 
+        persons = dict()
+        persons["by_username"] = persons_by_username
+        persons["by_name"] = persons_by_name
     return persons
