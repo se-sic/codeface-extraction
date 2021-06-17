@@ -438,7 +438,7 @@ def load_issue_via_api(issues, persons, url):
                     history["event_info_1"] = new_state
                     history["event_info_2"] = old_state
                     if hasattr(change, "author"):
-                        user = create_user(change.author.name, change.author.name, "")
+                        user = create_user(change.author.displayName, change.author.name, "")
                     else:
                         log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
                         user = create_user("","","")
@@ -458,7 +458,7 @@ def load_issue_via_api(issues, persons, url):
                     history["event_info_1"] = new_resolution
                     history["event_info_2"] = old_resolution
                     if hasattr(change, "author"):
-                        user = create_user(change.author.name, change.author.name, "")
+                        user = create_user(change.author.displayName, change.author.name, "")
                     else:
                         log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
                         user = create_user("","","")
@@ -471,9 +471,9 @@ def load_issue_via_api(issues, persons, url):
                 elif item.field == "assignee":
                     history = dict()
                     history["event"] = "assigned"
-                    user = create_user(change.author.name, change.author.name, "")
+                    user = create_user(change.author.displayName, change.author.name, "")
                     history["author"] = merge_user_with_user_from_csv(user, persons)
-                    assignee = create_user(item.toString, item.toString, "")
+                    assignee = create_user(item.toString, item.to, "")
                     assigned_user = merge_user_with_user_from_csv(assignee, persons)
                     history["event_info_1"] = assigned_user["name"]
                     history["event_info_2"] = assigned_user["email"]
@@ -485,7 +485,7 @@ def load_issue_via_api(issues, persons, url):
                     if item.toString is not None:
                         history = dict()
                         history["event"] = "add_link"
-                        user = create_user(change.author.name, change.author.name, "")
+                        user = create_user(change.author.displayName, change.author.name, "")
                         history["author"] = merge_user_with_user_from_csv(user, persons)
                         # api returns a text. The issueId is at the end of the text and gets extracted
                         history["event_info_1"] = item.toString.split()[-1]
@@ -497,7 +497,7 @@ def load_issue_via_api(issues, persons, url):
                     if item.fromString is not None:
                         history = dict()
                         history["event"] = "remove_link"
-                        user = create_user(change.author.name, change.author.name, "")
+                        user = create_user(change.author.displayName, change.author.name, "")
                         history["author"] = merge_user_with_user_from_csv(user, persons)
                         # api returns a text. Th issue id is at the end of the text and gets extracted
                         history["event_info_1"] = item.fromString.split()[-1]
