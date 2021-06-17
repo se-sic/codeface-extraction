@@ -14,7 +14,7 @@
 #
 # Copyright 2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2018 by Anselm Fehnker <fehnker@fim.uni-passau.de>
-# Copyright 2020 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2020-2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # All Rights Reserved.
 """
 This file provides the needed functions for standardized CSV writing
@@ -54,13 +54,14 @@ def write_to_csv(file_path, lines, append=False):
             line_encoded = __encode(line)
             wr.writerow(line_encoded)
 
-def read_from_csv(file_path):
+def read_from_csv(file_path, delimiter=";"):
     """
     Read lines from a given csv file.
 
     :param file_path: The path of the file to read from
+    :param delimiter: The delimiter of the columns in the csv file to read
 
     :return: A list containing the lines of the read file
     """
-    content = csv.reader(open(file_path), delimiter=";")
+    content = csv.reader(open(file_path), delimiter=delimiter)
     return list(content)
