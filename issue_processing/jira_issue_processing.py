@@ -602,24 +602,37 @@ def insert_user_data(issues, conf):
         # check database for issue author
         issue["author"] = get_id_and_update_user(issue["author"])
 
-        # check database for event authors
+        # check database for comment authors
         for comment in issue["comments"]:
             comment["author"] = get_id_and_update_user(comment["author"])
-            # # check database for the reference-target user if needed
-            # if event["ref_target"] != "":
-            #     event["ref_target"] = get_id_and_update_user(event["ref_target"])
+
+        # check database for event authors in the history
+        for event in issue["history"]:
+            event["author"] = get_id_and_update_user(event["author"])
+
+            # check database for target user if needed
+            if event["event"] == "assigned":
+                assigned_user = get_id_and_update_user(create_user(event["event_info_1"], "", event["event_info_2"]))
+                event["event_info_1"] = assigned_user
 
     # get all users after database updates having been performed
     for issue in issues:
         # get issue author
         issue["author"] = get_user_from_id(issue["author"])
 
-        # get event authors
+        # get comment authors
         for comment in issue["comments"]:
             comment["author"] = get_user_from_id(comment["author"])
-            # # get the reference-target user if needed
-            # if event["ref_target"] != "":
-            #     event["ref_target"] = get_user_from_id(event["ref_target"])
+
+        # get event authors for non-comment events
+        for event in issue["history"]:
+            event["author"] = get_user_from_id(event["author"])
+
+            # get target user if needed
+            if event["event"] == "assigned":
+                assigned_user = get_user_from_id(event["event_info_1"])
+                event["event_info_1"] = assigned_user["name"]
+                event["event_info_2"] = assigned_user["email"]
 
     log.debug("number of issues after insert_user_data: '{}'".format(len(issues)))
     return issues
