@@ -102,7 +102,13 @@ def run():
         if not args.skip_history:
             load_issue_via_api(issues, persons, __conf["issueTrackerURL"])
         # 4) update user data with Codeface database
-        # mabye not nessecary
+        #    ATTENTION: As the database update is performed for every iteration in this for loop, but the current issue
+        #    data is appended to the results file immediately, the database updates from the later iterations are not
+        #    respected in the previously dumped issues from the previous iterations. However, as we don't get email
+        #    data from JIRA, this is currently not a problem, as no names will change in the database if we don't
+        #    provide emails. If JIRA will provide email data in the future, this implementation needs to be adjusted
+        #    in such a way that users in issue data of all iterations are updated in the end and dumped afterwards,
+        #    instead of dumping the intermediate issue data immediately.
         issues = insert_user_data(issues, __conf)
         # 5) dump result to disk
         print_to_disk(issues, __resdir)
@@ -207,18 +213,29 @@ def merge_user_with_user_from_csv(user, persons):
     merges list of given users with list of already known users
 
     :param user: list of users to be merged
-    :param persons: list of persons from JIRA (incl. e-mail addresses)
+    :param persons: contains maps of names/usernames to persons from JIRA (incl. e-mail addresses),
+                    see function "load_csv"
     :return: list of merged users
     """
 
     new_user = dict()
-    if user["username"].lower() in persons.keys():
-        new_user["username"] = unicode(user["username"].lower()).encode("utf-8")
-        new_user["name"] = unicode(persons.get(user["username"].lower())[0]).encode("utf-8")
-        new_user["email"] = unicode(persons.get(user["username"].lower())[1]).encode("utf-8")
+    name_utf8 = unicode(user["name"]).encode("utf-8")
+    username_utf8 = unicode(user["username"].lower()).encode("utf-8")
+
+    if username_utf8 in persons["by_username"].keys():
+        new_user["username"] = username_utf8
+        new_user["name"] = unicode(persons["by_username"].get(username_utf8)[0]).encode("utf-8")
+        new_user["email"] = unicode(persons["by_username"].get(username_utf8)[1]).encode("utf-8")
+    elif name_utf8 in persons["by_name"].keys():
+        new_user["username"] = username_utf8
+        new_user["name"] = unicode(persons["by_name"].get(name_utf8)[0]).encode("utf-8")
+        new_user["email"] = unicode(persons["by_name"].get(name_utf8)[1]).encode("utf-8")
     else:
-        new_user = user
+        new_user["username"] = username_utf8
+        new_user["name"] = name_utf8
+        new_user["email"] = unicode(user["email"]).encode("utf-8")
         log.warning("User not in csv-file: " + str(user))
+
     log.info("current User: " + str(user) + ",    new user: " + str(new_user))
     return new_user
 
@@ -228,7 +245,7 @@ def parse_xml(issue_data, persons, skip_history):
     Parse issues from the xml-data
 
     :param issue_data: list of xml-files
-    :param persons: list of persons from JIRA (incl. e-mail addresses)
+    :param persons: list of persons from JIRA (incl. e-mail addresses), see function "load_csv"
     :param skip_history: flag if the history will be loaded in a different method
     :return: list of parsed issues
     """
@@ -368,7 +385,7 @@ def load_issue_via_api(issues, persons, url):
     For each issue in the list the history is added via the api
 
         :param issues: list of issues
-        :param persons: list of persons from JIRA (incl. e-mail addresses)
+        :param persons: list of persons from JIRA (incl. e-mail addresses), see function "load_csv"
         :param url: the project url
     """
 
@@ -421,7 +438,7 @@ def load_issue_via_api(issues, persons, url):
                     history["event_info_1"] = new_state
                     history["event_info_2"] = old_state
                     if hasattr(change, "author"):
-                        user = create_user(change.author.name, change.author.name, "")
+                        user = create_user(change.author.displayName, change.author.name, "")
                     else:
                         log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
                         user = create_user("","","")
@@ -441,7 +458,7 @@ def load_issue_via_api(issues, persons, url):
                     history["event_info_1"] = new_resolution
                     history["event_info_2"] = old_resolution
                     if hasattr(change, "author"):
-                        user = create_user(change.author.name, change.author.name, "")
+                        user = create_user(change.author.displayName, change.author.name, "")
                     else:
                         log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
                         user = create_user("","","")
@@ -454,9 +471,9 @@ def load_issue_via_api(issues, persons, url):
                 elif item.field == "assignee":
                     history = dict()
                     history["event"] = "assigned"
-                    user = create_user(change.author.name, change.author.name, "")
+                    user = create_user(change.author.displayName, change.author.name, "")
                     history["author"] = merge_user_with_user_from_csv(user, persons)
-                    assignee = create_user(item.toString, item.toString, "")
+                    assignee = create_user(item.toString, item.to, "")
                     assigned_user = merge_user_with_user_from_csv(assignee, persons)
                     history["event_info_1"] = assigned_user["name"]
                     history["event_info_2"] = assigned_user["email"]
@@ -468,7 +485,7 @@ def load_issue_via_api(issues, persons, url):
                     if item.toString is not None:
                         history = dict()
                         history["event"] = "add_link"
-                        user = create_user(change.author.name, change.author.name, "")
+                        user = create_user(change.author.displayName, change.author.name, "")
                         history["author"] = merge_user_with_user_from_csv(user, persons)
                         # api returns a text. The issueId is at the end of the text and gets extracted
                         history["event_info_1"] = item.toString.split()[-1]
@@ -480,7 +497,7 @@ def load_issue_via_api(issues, persons, url):
                     if item.fromString is not None:
                         history = dict()
                         history["event"] = "remove_link"
-                        user = create_user(change.author.name, change.author.name, "")
+                        user = create_user(change.author.displayName, change.author.name, "")
                         history["author"] = merge_user_with_user_from_csv(user, persons)
                         # api returns a text. Th issue id is at the end of the text and gets extracted
                         history["event_info_1"] = item.fromString.split()[-1]
@@ -509,7 +526,7 @@ def load_issue_via_api(issues, persons, url):
 
 def insert_user_data(issues, conf):
     """
-    Insert user data into database ad update issue data.
+    Insert user data into database and update issue data.
 
     :param issues: the issues to retrieve user data from
     :param conf: the project configuration
@@ -585,24 +602,37 @@ def insert_user_data(issues, conf):
         # check database for issue author
         issue["author"] = get_id_and_update_user(issue["author"])
 
-        # check database for event authors
+        # check database for comment authors
         for comment in issue["comments"]:
             comment["author"] = get_id_and_update_user(comment["author"])
-            # # check database for the reference-target user if needed
-            # if event["ref_target"] != "":
-            #     event["ref_target"] = get_id_and_update_user(event["ref_target"])
+
+        # check database for event authors in the history
+        for event in issue["history"]:
+            event["author"] = get_id_and_update_user(event["author"])
+
+            # check database for target user if needed
+            if event["event"] == "assigned":
+                assigned_user = get_id_and_update_user(create_user(event["event_info_1"], "", event["event_info_2"]))
+                event["event_info_1"] = assigned_user
 
     # get all users after database updates having been performed
     for issue in issues:
         # get issue author
         issue["author"] = get_user_from_id(issue["author"])
 
-        # get event authors
+        # get comment authors
         for comment in issue["comments"]:
             comment["author"] = get_user_from_id(comment["author"])
-            # # get the reference-target user if needed
-            # if event["ref_target"] != "":
-            #     event["ref_target"] = get_user_from_id(event["ref_target"])
+
+        # get event authors for non-comment events
+        for event in issue["history"]:
+            event["author"] = get_user_from_id(event["author"])
+
+            # get target user if needed
+            if event["event"] == "assigned":
+                assigned_user = get_user_from_id(event["event_info_1"])
+                event["event_info_1"] = assigned_user["name"]
+                event["event_info_2"] = assigned_user["email"]
 
     log.debug("number of issues after insert_user_data: '{}'".format(len(issues)))
     return issues
@@ -906,7 +936,8 @@ def load_csv(source_folder):
     Load persons from disk.
 
     :param source_folder: the folder where to find .csv-file
-    :return: the loaded person data
+    :return: the loaded person data contained in a dict consisting of two maps:
+             keys are either name ("by_name") or username ("by_username"), values are name-email pairs
     """
 
     def find_first_existing(source_folder, filenames):
@@ -941,9 +972,17 @@ def load_csv(source_folder):
     log.devinfo("Loading person csv from file '{}'...".format(srcfile))
     with open(srcfile, "r") as f:
         person_data = csv.DictReader(f, delimiter=",", skipinitialspace=True)
-        persons = {}
+        persons_by_username = {}
+        persons_by_name = {}
         for row in person_data:
-            if not row["AuthorID"] in persons.keys():
-                persons[row["AuthorID"]] = (row["AuthorName"], row["userEmail"])
+            if not row["AuthorID"] in persons_by_username.keys():
+                author_id_utf8 = unicode(row["AuthorID"]).encode("utf-8")
+                persons_by_username[author_id_utf8] = (row["AuthorName"], row["userEmail"])
+            if not row["AuthorName"] in persons_by_name.keys():
+                author_name_utf8 = unicode(row["AuthorName"]).encode("utf-8")
+                persons_by_name[author_name_utf8] = (row["AuthorName"], row["userEmail"])
 
+        persons = dict()
+        persons["by_username"] = persons_by_username
+        persons["by_name"] = persons_by_name
     return persons
