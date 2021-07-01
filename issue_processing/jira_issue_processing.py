@@ -41,6 +41,7 @@ from codeface.dbmanager import DBManager
 from csv_writer import csv_writer
 
 from jira import JIRA
+from jira.exceptions import JIRAError
 from time import sleep
 
 reload(sys)
@@ -403,107 +404,115 @@ def load_issue_via_api(issues, persons, url):
             log.info("Reset JIRA request counter and proceed...")
             jira_request_counter = 0
 
-        # send JIRA request for current issues and increase request counter
-        jira_request_counter += 1
-        log.info("JIRA request counter: " + str(jira_request_counter))
-        api_issue = jira_project.issue(issue["externalId"], expand="changelog")
-        changelog = api_issue.changelog
+        try:
+            # send JIRA request for current issues and increase request counter
+            jira_request_counter += 1
+            log.info("JIRA request counter: " + str(jira_request_counter))
+            api_issue = jira_project.issue(issue["externalId"], expand="changelog")
+            changelog = api_issue.changelog
+        except JIRAError:
+            log.warn("JIRA Error: Changelog cannot be extracted for issue " + issue["externalId"] + ". History omitted!")
+            changelog = None
+
         histories = list()
 
-        # adds the issue creation time with the default state to an list
+        # adds the issue creation time with the default state to a list
         # list is needed to find out the state the issue had when a comment was written
         state_changes = [[issue["creationDate"], "open"]]
 
-        # adds the issue creation time with the default resolution to an list
+        # adds the issue creation time with the default resolution to a list
         # list is needed to find out the resolution the issue had when a comment was written
         resolution_changes = [[issue["creationDate"], "unresolved"]]
 
-        # history changes get visited in time order from oldest to newest
-        for change in changelog.histories:
+        # only consider history changes if we were able to extract the changelog for the current issue
+        if changelog is not None:
 
-            # default values for state and resolution
-            old_state, new_state, old_resolution, new_resolution = "open", "open", "unresolved", "unresolved"
+            # history changes get visited in time order from oldest to newest
+            for change in changelog.histories:
 
-            # all changes in the issue changelog are checked if they contain an useful information
-            for item in change.items:
+                # default values for state and resolution
+                old_state, new_state, old_resolution, new_resolution = "open", "open", "unresolved", "unresolved"
 
-                # state_updated event gets created and added to the issue history
-                if item.field == "status":
-                    if item.fromString is not None:
-                        old_state = item.fromString.lower()
-                    if item.toString is not None:
-                        new_state = item.toString.lower()
-                    history = dict()
-                    history["event"] = "state_updated"
-                    history["event_info_1"] = new_state
-                    history["event_info_2"] = old_state
-                    if hasattr(change, "author"):
-                        user = create_user(change.author.displayName, change.author.name, "")
-                    else:
-                        log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
-                        user = create_user("","","")
-                    history["author"] = merge_user_with_user_from_csv(user, persons)
-                    history["date"] = format_time(change.created)
-                    histories.append(history)
-                    state_changes.append([history["date"], new_state])
+                # all changes in the issue changelog are checked if they contain an useful information
+                for item in change.items:
 
-                # resolution_updated event gets created and added to the issue history
-                elif item.field == "resolution":
-                    if item.fromString is not None:
-                        old_resolution = item.fromString.lower()
-                    if item.toString is not None:
-                        new_resolution = item.toString.lower()
-                    history = dict()
-                    history["event"] = "resolution_updated"
-                    history["event_info_1"] = new_resolution
-                    history["event_info_2"] = old_resolution
-                    if hasattr(change, "author"):
-                        user = create_user(change.author.displayName, change.author.name, "")
-                    else:
-                        log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
-                        user = create_user("","","")
-                    history["author"] = merge_user_with_user_from_csv(user, persons)
-                    history["date"] = format_time(change.created)
-                    histories.append(history)
-                    resolution_changes.append([history["date"], new_resolution])
-
-                # assigned event gets created and added to the issue history
-                elif item.field == "assignee":
-                    history = dict()
-                    history["event"] = "assigned"
-                    user = create_user(change.author.displayName, change.author.name, "")
-                    history["author"] = merge_user_with_user_from_csv(user, persons)
-                    assignee = create_user(item.toString, item.to, "")
-                    assigned_user = merge_user_with_user_from_csv(assignee, persons)
-                    history["event_info_1"] = assigned_user["name"]
-                    history["event_info_2"] = assigned_user["email"]
-                    history["date"] = format_time(change.created)
-                    histories.append(history)
-
-                elif item.field == "Link":
-                    # add_link event gets created and added to the issue history
-                    if item.toString is not None:
+                    # state_updated event gets created and added to the issue history
+                    if item.field == "status":
+                        if item.fromString is not None:
+                            old_state = item.fromString.lower()
+                        if item.toString is not None:
+                            new_state = item.toString.lower()
                         history = dict()
-                        history["event"] = "add_link"
+                        history["event"] = "state_updated"
+                        history["event_info_1"] = new_state
+                        history["event_info_2"] = old_state
+                        if hasattr(change, "author"):
+                            user = create_user(change.author.displayName, change.author.name, "")
+                        else:
+                            log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
+                            user = create_user("","","")
+                        history["author"] = merge_user_with_user_from_csv(user, persons)
+                        history["date"] = format_time(change.created)
+                        histories.append(history)
+                        state_changes.append([history["date"], new_state])
+
+                    # resolution_updated event gets created and added to the issue history
+                    elif item.field == "resolution":
+                        if item.fromString is not None:
+                            old_resolution = item.fromString.lower()
+                        if item.toString is not None:
+                            new_resolution = item.toString.lower()
+                        history = dict()
+                        history["event"] = "resolution_updated"
+                        history["event_info_1"] = new_resolution
+                        history["event_info_2"] = old_resolution
+                        if hasattr(change, "author"):
+                            user = create_user(change.author.displayName, change.author.name, "")
+                        else:
+                            log.warn("No author for history: " + str(change.id) + " created at " + str(change.created))
+                            user = create_user("","","")
+                        history["author"] = merge_user_with_user_from_csv(user, persons)
+                        history["date"] = format_time(change.created)
+                        histories.append(history)
+                        resolution_changes.append([history["date"], new_resolution])
+
+                    # assigned event gets created and added to the issue history
+                    elif item.field == "assignee":
+                        history = dict()
+                        history["event"] = "assigned"
                         user = create_user(change.author.displayName, change.author.name, "")
                         history["author"] = merge_user_with_user_from_csv(user, persons)
-                        # api returns a text. The issueId is at the end of the text and gets extracted
-                        history["event_info_1"] = item.toString.split()[-1]
-                        history["event_info_2"] = "issue"
+                        assignee = create_user(item.toString, item.to, "")
+                        assigned_user = merge_user_with_user_from_csv(assignee, persons)
+                        history["event_info_1"] = assigned_user["name"]
+                        history["event_info_2"] = assigned_user["email"]
                         history["date"] = format_time(change.created)
                         histories.append(history)
 
-                    # remove_link event gets created and added to the issue history
-                    if item.fromString is not None:
-                        history = dict()
-                        history["event"] = "remove_link"
-                        user = create_user(change.author.displayName, change.author.name, "")
-                        history["author"] = merge_user_with_user_from_csv(user, persons)
-                        # api returns a text. Th issue id is at the end of the text and gets extracted
-                        history["event_info_1"] = item.fromString.split()[-1]
-                        history["event_info_2"] = "issue"
-                        history["date"] = format_time(change.created)
-                        histories.append(history)
+                    elif item.field == "Link":
+                        # add_link event gets created and added to the issue history
+                        if item.toString is not None:
+                            history = dict()
+                            history["event"] = "add_link"
+                            user = create_user(change.author.displayName, change.author.name, "")
+                            history["author"] = merge_user_with_user_from_csv(user, persons)
+                            # api returns a text. The issueId is at the end of the text and gets extracted
+                            history["event_info_1"] = item.toString.split()[-1]
+                            history["event_info_2"] = "issue"
+                            history["date"] = format_time(change.created)
+                            histories.append(history)
+
+                        # remove_link event gets created and added to the issue history
+                        if item.fromString is not None:
+                            history = dict()
+                            history["event"] = "remove_link"
+                            user = create_user(change.author.displayName, change.author.name, "")
+                            history["author"] = merge_user_with_user_from_csv(user, persons)
+                            # api returns a text. Th issue id is at the end of the text and gets extracted
+                            history["event_info_1"] = item.fromString.split()[-1]
+                            history["event_info_2"] = "issue"
+                            history["date"] = format_time(change.created)
+                            histories.append(history)
 
         # state and resolution change lists get sorted by time
         state_changes.sort(key=lambda x: x[0])
