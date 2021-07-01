@@ -130,10 +130,18 @@ def add_user_data(bot_data, user_data):
     # update all bots
     for user in bot_data:
         bot_reduced = dict()
-        # get user information
-        bot_reduced["user"] = user_buffer[user[0]]
-        bot_reduced["prediction"] = user[-1]
-        bot_data_reduced.append(bot_reduced)
+
+        # bot data might contain empty lines, which need to be ignored
+        if len(user) == 0:
+            continue
+
+        # get user information if available
+        if user[0] in user_buffer.keys():
+            bot_reduced["user"] = user_buffer[user[0]]
+            bot_reduced["prediction"] = user[-1]
+            bot_data_reduced.append(bot_reduced)
+        else:
+            log.warn("User '{}' in bot data does not occur in GitHub user data. Remove user...".format(user[0]))
 
     return bot_data_reduced
 
