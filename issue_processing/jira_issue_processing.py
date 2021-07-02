@@ -170,7 +170,7 @@ def load_xml(source_folder, xml_file):
 
 def format_time(time):
     """
-    Format times from different sources to a consistent time format
+    Format times from different sources to a consistent time format.
 
     :param time: the time that shall be formatted
     :return: the formatted time
@@ -186,11 +186,11 @@ def format_time(time):
 
 def create_user(name, username, email):
     """
-    Creates an user object with all needed information
+    Create a user object with all needed information.
 
     :param name: the name the user shall have
     :param username: the username the user shall have
-    :param email:  the email the user shall have
+    :param email: the email the user shall have
     :return: the created user object
     """
 
@@ -211,7 +211,7 @@ def create_user(name, username, email):
 
 def merge_user_with_user_from_csv(user, persons):
     """
-    merges list of given users with list of already known users
+    Merge list of given users with list of already known users.
 
     :param user: list of users to be merged
     :param persons: contains maps of names/usernames to persons from JIRA (incl. e-mail addresses),
@@ -243,7 +243,7 @@ def merge_user_with_user_from_csv(user, persons):
 
 def parse_xml(issue_data, persons, skip_history):
     """
-    Parse issues from the xml-data
+    Parse issues from the xml-data.
 
     :param issue_data: list of xml-files
     :param persons: list of persons from JIRA (incl. e-mail addresses), see function "load_csv"
@@ -383,11 +383,11 @@ def parse_xml(issue_data, persons, skip_history):
 
 def load_issue_via_api(issues, persons, url):
     """
-    For each issue in the list the history is added via the api
+    For each issue in the list the history is added via the api.
 
-        :param issues: list of issues
-        :param persons: list of persons from JIRA (incl. e-mail addresses), see function "load_csv"
-        :param url: the project url
+    :param issues: list of issues
+    :param persons: list of persons from JIRA (incl. e-mail addresses), see function "load_csv"
+    :param url: the project url
     """
 
     log.info("Load issue information via api...")
@@ -433,7 +433,7 @@ def load_issue_via_api(issues, persons, url):
                 # default values for state and resolution
                 old_state, new_state, old_resolution, new_resolution = "open", "open", "unresolved", "unresolved"
 
-                # all changes in the issue changelog are checked if they contain an useful information
+                # all changes in the issue changelog are checked if they contain a useful information
                 for item in change.items:
 
                     # state_updated event gets created and added to the issue history
@@ -649,7 +649,7 @@ def insert_user_data(issues, conf):
 
 def print_to_disk(issues, results_folder):
     """
-    Print issues to file "issues-jira.list" in result folder
+    Print issues to file "issues-jira.list" in result folder.
 
     :param issues: the issues to dump
     :param results_folder: the folder where to place "issues-jira.list" output file
@@ -744,7 +744,7 @@ def print_to_disk(issues, results_folder):
 
 def print_to_disk_bugs(issues, results_folder):
     """
-    Sorts of bug issues and prints them to file "bugs-jira.list" in result folder
+    Extract bug issues and prints them to file "bugs-jira.list" in result folder.
     This method prints in a format which is consistent to the format of "print_to_disk" in "issue_processing.py".
 
     :param issues: the issues to sort of bugs
@@ -760,7 +760,7 @@ def print_to_disk_bugs(issues, results_folder):
     for issue in issues:
         log.info("Current issue '{}'".format(issue["externalId"]))
 
-        # only writes issues with type bug and their comments in the output file
+        # only write issues with type bug and their comments in the output file
         if "bug" in issue["type_list"]:
 
             # add the creation event
@@ -843,7 +843,7 @@ def print_to_disk_bugs(issues, results_folder):
 
 def print_to_disk_extr(issues, results_folder):
     """
-    Print issues to file "issues.list" in result folder
+    Print issues to file "issues.list" in result folder.
 
     :param issues: the issues to dump
     :param results_folder: the folder where to place "issues.list" output file
