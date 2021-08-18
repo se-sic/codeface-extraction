@@ -17,7 +17,9 @@
 # All Rights Reserved.
 """
 This file is able to disambiguate authors after the extraction from the Codeface database was performed. A manually
-created disambiguation file is used to disambiguate the authors in all the extracted files of a project.
+created disambiguation file is used to disambiguate the authors in all the extracted files of a project. In addition,
+the author "GitHub <noreply@github.com>" is removed from all the data and is either replaced by the actual author or,
+if this is not possible, the corresponding event is removed from the data.
 
 The manually created disambiguation file 'disambiguation-after-db.list' has to have the following format:
     - each line combines two person identities which should be mapped to each other
@@ -76,6 +78,129 @@ def perform_data_backup(results_path, results_path_backup):
                     copy(current_file, backup_file)
 
 
+def fix_github_browser_commits(data_path, issues_github_list, commits_list, authors_list, emails_list):
+    """
+    Replace the author "GitHub <noreply@github.com>" in both commit and GitHub issue data by the correct author.
+    The author "GitHub <noreply@github.com>" is automatically inserted as the committer of a commit that is made when
+    editing a file via the web frontend of GitHub. Hence, replace the committer of such commits with the commit's
+    author, as author and committer are the same person in such a situation. This also holds for the "commit_added"
+    event in GitHub issue data: As this usually uses the committer of a commit as its author, also use the commit's
+    author as the author of the "commit_added" event. In addition, remove the author "GitHub <noreply@github.com>"
+    also from the author data and remove e-mails that have been sent by this author.
+
+    :param data_path: the path to the project data that is to be fixed
+    :param issues_github_list: file name of the github issue data
+    :param commits_list: file name of the corresponding commit data
+    :param authors_list: file name of the corresponding author data
+    :param emails_list: file name of the corresponding email data
+    """
+    github_user = "GitHub"
+    github_email = "noreply@github.com"
+    commit_added_event = "commit_added"
+
+    """
+    Helper function to check whether a (name, e-mail) pair belongs to the author "GitHub <noreply@github.com>".
+    There are two options in Codeface how this can happen:
+    (1) Username is "GitHub" and e-mail address is "noreply@github.com"
+    (2) Username is "GitHub" and e-mail address has been replaced by Codeface, resulting in "GitHub.noreply@github.com"
+
+    :param name: the name of the author to be checked
+    :param email: the email address of the author to be checked
+    :return: whether the given (name, email) pair belongs to the "GitHub <noreply@github.com>" author
+    """
+    def is_github_noreply_author(name, email):
+        return (name == github_user and (email == github_email or email == (github_user + "." + github_email)))
+
+
+    # Check for all files in the result directory of the project whether they need to be adjusted
+    for filepath, dirnames, filenames in walk(data_path):
+
+        # (1) Remove author 'GitHub <noreply@github.com>' from authors list
+        if authors_list in filenames:
+            f = path.join(filepath, authors_list)
+            log.info("Remove author %s <%s> in %s ...", github_user, github_email, f)
+            author_data = csv_writer.read_from_csv(f)
+
+            author_data_new = []
+
+            for author in author_data:
+                # keep author entry only if it should not be removed
+                if not is_github_noreply_author(author[1], author[2]):
+                    author_data_new.append(author)
+            csv_writer.write_to_csv(f, author_data_new)
+
+        # (2) Remove e-mails from author 'GitHub <noreply@github.com>' from all emails.list files
+        if emails_list in filenames:
+            f = path.join(filepath, emails_list)
+            log.info("Remove emails from author %s <%s> in %s ...", github_user, github_email, f)
+            email_data = csv_writer.read_from_csv(f)
+
+            email_data_new = []
+
+            for email in email_data:
+                # keep author entry only if it should not be removed
+                if not is_github_noreply_author(email[0], email[1]):
+                    email_data_new.append(email)
+                else:
+                    log.warn("Remove email %s as it was sent by %s <%s>.", email[2], email[0], email[1])
+            csv_writer.write_to_csv(f, email_data_new)
+
+
+        # (3) Replace the committer 'GitHub <noreply@github.com>' in all commit.list files
+        if commits_list in filenames:
+            f = path.join(filepath, commits_list)
+            log.info("Replace author %s <%s> in %s ...", github_user, github_email, f)
+            commit_data = csv_writer.read_from_csv(f)
+
+            for commit in commit_data:
+                # replace committer 'GitHub <noreply@github.com>' by the commit's author
+                # (as author and committer are identical when using GitHub's browser interface)
+                if is_github_noreply_author(commit[5], commit[6]):
+                    commit[5] = commit[2]
+                    commit[6] = commit[3]
+
+            csv_writer.write_to_csv(f, commit_data)
+
+        # (4) Replace author 'GitHub <noreply@github.com>' in all "commit_added" events in the GitHub issue data
+        if issues_github_list in filenames:
+            f = path.join(filepath, issues_github_list)
+            log.info("Replace author %s <%s> in %s ...", github_user, github_email, f)
+            issue_data = csv_writer.read_from_csv(f)
+
+            # read commit data
+            commit_data_file = path.join(data_path, commits_list)
+            commit_data = csv_writer.read_from_csv(commit_data_file)
+            commit_hash_to_author = {commit[7]: commit[2:4] for commit in commit_data}
+
+            issue_data_new = []
+
+            for event in issue_data:
+                # replace author if necessary
+                if is_github_noreply_author(event[9], event[10]) and event[8] == commit_added_event:
+                    # extract commit hash from event info 1
+                    commit_hash = event[12]
+
+                    # extract commit author from commit data, if available
+                    if commit_hash in commit_hash_to_author:
+                        event[9] = commit_hash_to_author[commit_hash][0]
+                        event[10] = commit_hash_to_author[commit_hash][1]
+                        issue_data_new.append(event)
+                    else:
+                        # the added commit is not part of the commit data. In most cases, this is due to merge commits
+                        # appearing in another pull request, as Codeface does not keep track of merge commits. As we
+                        # ignore merge commits in the commit data, we consistently ignore them also if they are added
+                        # to a pull request. Hence, the corresponding "commit_added" event will be removed now (i.e.,
+                        # not added to the new issue data any more).
+                        log.warn("Commit %s is added in the GitHub issue data, but not part of the commit data. " +
+                                 "Remove the corresponding 'commit_added' event from the issue data...", commit_hash)
+                else:
+                    issue_data_new.append(event)
+
+            csv_writer.write_to_csv(f, issue_data_new)
+
+    log.info("Replacing GitHub user: Done.")
+
+
 def run_postprocessing(conf, resdir, backup_data):
     """
     Runs the postprocessing for the given parameters, that is, read the disambiguation file of the project
@@ -96,8 +221,6 @@ def run_postprocessing(conf, resdir, backup_data):
         perform_data_backup(results_path, results_path_backup)
         log.info("%s: Backup of current data complete!" % conf["project"])
 
-    log.info("%s: Postprocess authors after manual disambiguation" % conf["project"])
-
     authors_list = "authors.list"
     commits_list = "commits.list"
     emails_list = "emails.list"
@@ -109,7 +232,14 @@ def run_postprocessing(conf, resdir, backup_data):
     # When looking at elements originating from json lists, we need to consider quotation marks around the string
     quot_m = "\""
 
-    disambiguation_list = path.join(resdir, conf["project"], conf["tagging"], "disambiguation-after-db.list")
+    data_path = path.join(resdir, conf["project"], conf["tagging"])
+
+    # Correctly replace author 'GitHub <noreply@github.com>' in the commit data and in "commit_added" events of the
+    # GitHub issue data and remove this author in the author data and e-mail data
+    fix_github_browser_commits(data_path, issues_github_list, commits_list, authors_list, emails_list)
+
+    log.info("%s: Postprocess authors after manual disambiguation" % conf["project"])
+    disambiguation_list = path.join(data_path, "disambiguation-after-db.list")
 
     # Check if a disambiguation list exists - if not, just stop
     if path.exists(disambiguation_list):
@@ -120,7 +250,7 @@ def run_postprocessing(conf, resdir, backup_data):
         return
 
     # Check for all files in the result directory of the project whether they need to be adjusted
-    for filepath, dirnames, filenames in walk(path.join(resdir, conf["project"], conf["tagging"])):
+    for filepath, dirnames, filenames in walk(data_path):
 
         # (1) Adjust authors lists
         if authors_list in filenames:
