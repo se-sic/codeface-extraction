@@ -120,7 +120,7 @@ def check_with_known_bot_list(known_bots_file, bot_data, user_data, bot_data_red
     :param bot_data: the bot data originating from the bot prediction
     :param user_data: a dictionary from the issue data which maps GitHub usernames to authors
     :param bot_data_reduced: the bot data after mapping GitHub user names to authors
-    :return: the bot data as provided in param 'bot_data_reduced' but possibly enrichted with
+    :return: the bot data as provided in param 'bot_data_reduced' but possibly enriched with
              additional bots (if occurring) or updated bots
     """
 

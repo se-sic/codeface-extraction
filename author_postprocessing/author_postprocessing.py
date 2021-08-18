@@ -18,7 +18,7 @@
 """
 This file is able to disambiguate authors after the extraction from the Codeface database was performed. A manually
 created disambiguation file is used to disambiguate the authors in all the extracted files of a project. In addition,
-the author "GitHub <noreply@github.com" is removed from all the data and is either replaced by the actual author or,
+the author "GitHub <noreply@github.com>" is removed from all the data and is either replaced by the actual author or,
 if this is not possible, the corresponding event is removed from the data.
 
 The manually created disambiguation file 'disambiguation-after-db.list' has to have the following format:
@@ -107,7 +107,6 @@ def fix_github_browser_commits(data_path, issues_github_list, commits_list, auth
     :param name: the name of the author to be checked
     :param email: the email address of the author to be checked
     :return: whether the given (name, email) pair belongs to the "GitHub <noreply@github.com>" author
-
     """
     def is_github_noreply_author(name, email):
         return (name == github_user and (email == github_email or email == (github_user + "." + github_email)))
@@ -189,7 +188,7 @@ def fix_github_browser_commits(data_path, issues_github_list, commits_list, auth
                     else:
                         # the added commit is not part of the commit data. In most cases, this is due to merge commits
                         # appearing in another pull request, as Codeface does not keep track of merge commits. As we
-                        # ignore merge commits in the commit data, we consistenly ignore them also if they are added
+                        # ignore merge commits in the commit data, we consistently ignore them also if they are added
                         # to a pull request. Hence, the corresponding "commit_added" event will be removed now (i.e.,
                         # not added to the new issue data any more).
                         log.warn("Commit %s is added in the GitHub issue data, but not part of the commit data. " +
