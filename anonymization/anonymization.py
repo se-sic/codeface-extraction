@@ -58,6 +58,7 @@ def run_anonymization(conf, resdir):
     issues_jira_list = "issues-jira.list"
     bugs_jira_list = "bugs-jira.list"
     bots_list = "bots.list"
+    revisions_list = "revisions.list" # not to be anonymized, only to be copied to the "anonymized" directory
 
     # When looking at elements originating from json lists, we need to consider quotation marks around the string
     quot_m = "\""
@@ -325,6 +326,19 @@ def run_anonymization(conf, resdir):
                 makedirs(path.dirname(output_path))
             log.info("Write anonymized data to %s ...", output_path)
             csv_writer.write_to_csv(output_path, bot_data)
+
+        # (8) Coyp revisions list
+        if revisions_list in filenames:
+            f = path.join(filepath, revisions_list)
+            log.info("Copy %s ...", f)
+            revision_data = csv_writer.read_from_csv(f)
+
+            output_path = f.replace(data_path, anonymize_path)
+            if not path.exists(path.dirname(output_path)):
+                makedirs(path.dirname(output_path))
+            log.info("Copy revision data to %s ...", output_path)
+            csv_writer.write_to_csv(output_path, revision_data)
+
 
     log.info("Anonymization complete!")
 
