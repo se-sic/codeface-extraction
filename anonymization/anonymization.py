@@ -172,7 +172,7 @@ def run_anonymization(conf, resdir):
             log.info("Write anonymized data to %s ...", output_path)
             csv_writer.write_to_csv(output_path, author_data)
 
-        # (2) Anonyimze commits lists
+        # (2) Anonymize commits lists
         if commits_list in filenames:
             f = path.join(filepath, commits_list)
             log.info("Anonymize %s ...", f)
@@ -327,7 +327,7 @@ def run_anonymization(conf, resdir):
             log.info("Write anonymized data to %s ...", output_path)
             csv_writer.write_to_csv(output_path, bot_data)
 
-        # (8) Coyp revisions list
+        # (8) Copy revisions list
         if revisions_list in filenames:
             f = path.join(filepath, revisions_list)
             log.info("Copy %s ...", f)
