@@ -78,7 +78,7 @@ def perform_data_backup(results_path, results_path_backup):
                     copy(current_file, backup_file)
 
 
-def fix_github_browser_commits(data_path, issues_github_list, commits_list, authors_list, emails_list):
+def fix_github_browser_commits(data_path, issues_github_list, commits_list, authors_list, emails_list, bots_list):
     """
     Replace the author "GitHub <noreply@github.com>" in both commit and GitHub issue data by the correct author.
     The author "GitHub <noreply@github.com>" is automatically inserted as the committer of a commit that is made when
@@ -88,14 +88,15 @@ def fix_github_browser_commits(data_path, issues_github_list, commits_list, auth
     author as the author of the "commit_added" event. All other events in the GitHub issue data in which the author is
     "GitHub <noreply@github.com>" are removed. Also "mentioned" or "subscribed" events in the GitHub issue data which
     reference the author "GitHub <noreply@github.com>" are removed from the GitHub issue data. In addition, remove the
-    author "GitHub <noreply@github.com>" also from the author data and remove e-mails that have been sent by this
-    author.
+    author "GitHub <noreply@github.com>" also from the author data and bot data and remove e-mails that have been sent
+    by this author.
 
     :param data_path: the path to the project data that is to be fixed
     :param issues_github_list: file name of the github issue data
     :param commits_list: file name of the corresponding commit data
     :param authors_list: file name of the corresponding author data
     :param emails_list: file name of the corresponding email data
+    :param bots_list: file name of the corresponding bot data
     """
     github_user = "GitHub"
     github_email = "noreply@github.com"
@@ -215,6 +216,23 @@ def fix_github_browser_commits(data_path, issues_github_list, commits_list, auth
 
             csv_writer.write_to_csv(f, issue_data_new)
 
+        # (5) Remove author 'GitHub <noreply@github.com>' from bots.list
+        if bots_list in filenames:
+            f = path.join(filepath, bots_list)
+            log.info("Remove author %s <%s> from %s ...", github_user, github_email, f)
+            bot_data = csv_writer.read_from_csv(f)
+
+            bot_data_new = []
+
+            for entry in bot_data:
+                # keep bot entry only if it should not be removed
+                if not is_github_noreply_author(entry[0], entry[1]):
+                    bot_data_new.append(entry)
+                else:
+                    log.warn("Remove entry %s <%s> from bots list.", entry[0], entry[1])
+
+            csv_writer.write_to_csv(f, bot_data_new)
+
     log.info("Replacing GitHub user: Done.")
 
 
@@ -252,8 +270,8 @@ def run_postprocessing(conf, resdir, backup_data):
     data_path = path.join(resdir, conf["project"], conf["tagging"])
 
     # Correctly replace author 'GitHub <noreply@github.com>' in the commit data and in "commit_added" events of the
-    # GitHub issue data and remove this author in the author data and e-mail data
-    fix_github_browser_commits(data_path, issues_github_list, commits_list, authors_list, emails_list)
+    # GitHub issue data and remove this author in the author data, bot data, and e-mail data
+    fix_github_browser_commits(data_path, issues_github_list, commits_list, authors_list, emails_list, bots_list)
 
     log.info("%s: Postprocess authors after manual disambiguation" % conf["project"])
     disambiguation_list = path.join(data_path, "disambiguation-after-db.list")
