@@ -85,8 +85,11 @@ def fix_github_browser_commits(data_path, issues_github_list, commits_list, auth
     editing a file via the web frontend of GitHub. Hence, replace the committer of such commits with the commit's
     author, as author and committer are the same person in such a situation. This also holds for the "commit_added"
     event in GitHub issue data: As this usually uses the committer of a commit as its author, also use the commit's
-    author as the author of the "commit_added" event. In addition, remove the author "GitHub <noreply@github.com>"
-    also from the author data and remove e-mails that have been sent by this author.
+    author as the author of the "commit_added" event. All other events in the GitHub issue data in which the author is
+    "GitHub <noreply@github.com>" are removed. Also "mentioned" or "subscribed" events in the GitHub issue data which
+    reference the author "GitHub <noreply@github.com>" are removed from the GitHub issue data. In addition, remove the
+    author "GitHub <noreply@github.com>" also from the author data and remove e-mails that have been sent by this
+    author.
 
     :param data_path: the path to the project data that is to be fixed
     :param issues_github_list: file name of the github issue data
@@ -97,6 +100,8 @@ def fix_github_browser_commits(data_path, issues_github_list, commits_list, auth
     github_user = "GitHub"
     github_email = "noreply@github.com"
     commit_added_event = "commit_added"
+    mentioned_event = "mentioned"
+    subscribed_event = "subscribed"
 
     """
     Helper function to check whether a (name, e-mail) pair belongs to the author "GitHub <noreply@github.com>".
@@ -162,6 +167,7 @@ def fix_github_browser_commits(data_path, issues_github_list, commits_list, auth
             csv_writer.write_to_csv(f, commit_data)
 
         # (4) Replace author 'GitHub <noreply@github.com>' in all "commit_added" events in the GitHub issue data
+        # and remove all other events in which 'GitHub <noreply@github.com>' is either author or referenced.
         if issues_github_list in filenames:
             f = path.join(filepath, issues_github_list)
             log.info("Replace author %s <%s> in %s ...", github_user, github_email, f)
@@ -193,6 +199,17 @@ def fix_github_browser_commits(data_path, issues_github_list, commits_list, auth
                         # not added to the new issue data any more).
                         log.warn("Commit %s is added in the GitHub issue data, but not part of the commit data. " +
                                  "Remove the corresponding 'commit_added' event from the issue data...", commit_hash)
+                elif is_github_noreply_author(event[9], event[10]):
+                    # the event is authored by 'GitHub <noreply@github.com>', but is not a "commit_added" event, so we
+                    # neglect this event and remove it now (i.e., not add it to the new issue data any more).
+                    log.warn("Event %s is authored by %s <%s>. Remove this event form the issue data...",
+                             event[8], event[9], event[10])
+                elif (is_github_noreply_author(event[12], event[13][1:-1])
+                      and (event[8] == mentioned_event or event[8] == subscribed_event)):
+                    # the event references 'GitHub <noreply@github.com>', so we neglect this event and remove it now
+                    # (i.e., not add it to the new issue data any more).
+                    log.warn("Event %s by %s <%s> references %s <%s>. Remove this event from the issue data...",
+                             event[8], event[9], event[10], event[12], event[13])
                 else:
                     issue_data_new.append(event)
 
