@@ -57,7 +57,7 @@ def run():
     # 1) load bot data
     bots = load_bot_data(os.path.join(__srcdir, "bots.csv"), header = True)
     # 2) load user data
-    users = load_user_data(os.path.join(__srcdir, "usernames.list"))
+    users = load_user_data(os.path.join(__resdir, "usernames.list"))
     # 3) update bot data with user data and additionally add known bots if they occur in the project
     bots = add_user_data(bots, users, __known_bots_file)
     # 4) dump result to disk

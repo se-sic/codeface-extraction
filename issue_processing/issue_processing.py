@@ -79,8 +79,8 @@ def run():
     issues = merge_issue_events(issues)
     # 4) re-format the eventsList of the issues
     issues = reformat_events(issues)
-    # 5) update user data with Codeface database
-    issues = insert_user_data(issues, __conf, __srcdir)
+    # 5) update user data with Codeface database and dump username-to-name/e-mail list
+    issues = insert_user_data(issues, __conf, __resdir)
     # 6) dump result to disk
     print_to_disk(issues, __resdir)
 
@@ -651,14 +651,14 @@ def reformat_events(issue_data):
     return issue_data
 
 
-def insert_user_data(issues, conf, srcdir):
+def insert_user_data(issues, conf, resdir):
     """
     Insert user data into database and update issue data.
     In addition, dump username-to-user list to file.
 
     :param issues: the issues to retrieve user data from
     :param conf: the project configuration
-    :param srcdir: the directory in which the username-to-user list should be dumped
+    :param resdir: the directory in which the username-to-user-list should be dumped
     :return: the updated issue data
     """
 
@@ -775,7 +775,7 @@ def insert_user_data(issues, conf, srcdir):
         ))
 
     log.info("Dump username list to file...")
-    username_dump = os.path.join(srcdir, "usernames.list")
+    username_dump = os.path.join(resdir, "usernames.list")
     csv_writer.write_to_csv(username_dump, sorted(set(lines), key=lambda line: line[0]))
 
     return issues
