@@ -13,7 +13,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright 2015-2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
-# Copyright 2020-2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2020-2022 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # All Rights Reserved.
 """
 This file is able to disambiguate authors after the extraction from the Codeface database was performed. A manually
@@ -403,6 +403,9 @@ def run_postprocessing(conf, resdir, backup_data):
             log.info("Postprocess %s ...", f)
             bot_data = csv_writer.read_from_csv(f)
 
+            bot_data_new = []
+            bot_names_and_emails = dict()
+
             for person in disambiguation_data:
                 for bot in bot_data:
                     # replace author if necessary
@@ -410,7 +413,31 @@ def run_postprocessing(conf, resdir, backup_data):
                         bot[0] = person[1]
                         bot[1] = person[2]
 
-            csv_writer.write_to_csv(f, bot_data)
+            # check for duplicate bot entries
+            for bot in bot_data:
+                # check if the bot is not already in the dict and add it
+                if (bot[0], bot[1]) not in bot_names_and_emails:
+                    bot_names_and_emails[(bot[0], bot[1])] = bot
+                else:
+                    # the bot is already in the list, check if there are different predictions
+                    stored_bot = bot_names_and_emails[(bot[0], bot[1])]
+                    if stored_bot[2] != bot[2]:
+                        # if either of the predictions is bot, keep bot
+                        if (stored_bot[2] == "Bot" or bot[2] == "Bot"):
+                            stored_bot[2] = "Bot"
+                            bot_names_and_emails[(bot[0], bot[1])] = stored_bot
+                        # otherwise, if either of the predictions is human, keep human
+                        elif (stored_bot[2] == "Human" or bot[2] == "Human"):
+                            stored_bot[2] = "Human"
+                            bot_names_and_emails[(bot[0], bot[1])] = stored_bot
+
+            # determine final bot entries
+            for bot in bot_data:
+                updated_bot = bot_names_and_emails[(bot[0], bot[1])]
+                if updated_bot not in bot_data_new:
+                    bot_data_new.append(updated_bot)
+
+            csv_writer.write_to_csv(f, bot_data_new)
 
     log.info("Postprocessing complete!")
 

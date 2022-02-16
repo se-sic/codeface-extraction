@@ -12,7 +12,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
-# Copyright 2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2021-2022 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # All Rights Reserved.
 """
 This file is able to extract information on bot/human users from csv files.
@@ -220,11 +220,12 @@ def print_to_disk(bot_data, results_folder):
     # construct lines of output
     lines = []
     for user in bot_data:
-        lines.append((
-             user["user"]["name"],
-             user["user"]["email"],
-             user["prediction"]
-        ))
+        entry = (user["user"]["name"],
+                 user["user"]["email"],
+                 user["prediction"]
+                )
+        if not entry in lines:
+            lines.append(entry)
 
     # write to output file
     csv_writer.write_to_csv(output_file, lines)
