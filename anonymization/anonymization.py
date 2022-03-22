@@ -14,12 +14,13 @@
 #
 # Copyright 2015-2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2022 by Christian Hechtl <hechtl@cs.uni-saarland.de>
 # All Rights Reserved.
 """
 This file is able to anonymize authors and issue titles after the extraction from the Codeface database was performed.
 Author name, e-mail address, message id, and issue title are replaced by an anonymized name (e.g., "developer1",
-"developer1@dev.org", "message1@dev.org", etc.) Columns that contain a name, e-mail address, message id, or issue title
-are anonymized in author data, commit data, email data, issue data, and bot data.
+"developer1@dev.org", "message1@dev.org", etc.). Columns that contain a name, e-mail address, message id, or issue title
+are anonymized in author data, commit data, email data, issue data, bot data, and gender data.
 The resulting anonymized data are written to a separate directory "<resdir>_anonymized" (e.g., if <resdir> is
 "threemonth", the anonymized data is written to "threemonth_anonymized").
 """
@@ -58,6 +59,7 @@ def run_anonymization(conf, resdir):
     issues_jira_list = "issues-jira.list"
     bugs_jira_list = "bugs-jira.list"
     bots_list = "bots.list"
+    gender_list = "gender.list"
     revisions_list = "revisions.list" # not to be anonymized, only to be copied to the "anonymized" directory
 
     # When looking at elements originating from json lists, we need to consider quotation marks around the string
@@ -73,7 +75,9 @@ def run_anonymization(conf, resdir):
 
     # create dictionaries to store mappings from authors to anonymized authors and titles to anonymized titles
     author_to_anonymized_author = dict()
+    author_to_anonymized_author_gender = dict()
     i = 0
+    i_gender = 0
     title_to_anonymized_title = dict()
     k = 0
 
@@ -144,6 +148,7 @@ def run_anonymization(conf, resdir):
             f = path.join(filepath, authors_list)
             log.info("Anonymize %s ...", f)
             author_data = csv_writer.read_from_csv(f)
+            author_data_gender = csv_writer.read_from_csv(f)
 
             # check if tagging is "feature"
             if conf["tagging"] == "feature":
@@ -165,6 +170,9 @@ def run_anonymization(conf, resdir):
             # anonymize authors
             author_data, i, author_to_anonymized_author = \
               anonymize_authors(author_data, i, author_to_anonymized_author)
+          
+            author_data_gender, i_gender, author_to_anonymized_author_gender = \
+              anonymize_authors(author_data_gender, i_gender, author_to_anonymized_author_gender, name_only = True)
 
             output_path = f.replace(data_path, anonymize_path)
             if not path.exists(path.dirname(output_path)):
@@ -326,8 +334,27 @@ def run_anonymization(conf, resdir):
                 makedirs(path.dirname(output_path))
             log.info("Write anonymized data to %s ...", output_path)
             csv_writer.write_to_csv(output_path, bot_data)
+        
+        # (8) Anonymize gender list
+        if gender_list in filenames:
+            f = path.join(filepath, gender_list)
+            log.info("Anonymize %s ...", f)
+            gender_data = csv_writer.read_from_csv(f)
+            gender_data_new = []
 
-        # (8) Copy revisions list
+            for author in gender_data:
+                if author[0] in author_to_anonymized_author_gender.keys():
+                    new_person = author_to_anonymized_author_gender[author[0]]
+                    author[0] = new_person[0]
+                    gender_data_new.append(author)
+
+            output_path = f.replace(data_path, anonymize_path)
+            if not path.exists(path.dirname(output_path)):
+                makedirs(path.dirname(output_path))
+            log.info("Write anonymized data to %s ...", output_path)
+            csv_writer.write_to_csv(output_path, gender_data_new)
+
+        # (9) Copy revisions list
         if revisions_list in filenames:
             f = path.join(filepath, revisions_list)
             log.info("Copy %s ...", f)
