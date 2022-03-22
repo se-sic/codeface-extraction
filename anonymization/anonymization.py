@@ -76,6 +76,7 @@ def run_anonymization(conf, resdir):
     author_to_anonymized_author = dict()
     author_to_anonymized_author_gender = dict()
     i = 0
+    i_gender = 0
     title_to_anonymized_title = dict()
     k = 0
 
@@ -168,10 +169,9 @@ def run_anonymization(conf, resdir):
             # anonymize authors
             author_data, i, author_to_anonymized_author = \
               anonymize_authors(author_data, i, author_to_anonymized_author)
-            i = 0
           
-            author_data_gender, i, author_to_anonymized_author_gender = \
-              anonymize_authors(author_data_gender, i, author_to_anonymized_author_gender, name_only = True)
+            author_data_gender, i_gender, author_to_anonymized_author_gender = \
+              anonymize_authors(author_data_gender, i_gender, author_to_anonymized_author_gender, name_only = True)
 
             output_path = f.replace(data_path, anonymize_path)
             if not path.exists(path.dirname(output_path)):
