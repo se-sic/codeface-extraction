@@ -14,12 +14,13 @@
 #
 # Copyright 2015-2017 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2022 by Christian Hechtl <hechtl@cs.uni-saarland.de>
 # All Rights Reserved.
 """
 This file is able to anonymize authors and issue titles after the extraction from the Codeface database was performed.
 Author name, e-mail address, message id, and issue title are replaced by an anonymized name (e.g., "developer1",
-"developer1@dev.org", "message1@dev.org", etc.) Columns that contain a name, e-mail address, message id, or issue title
-are anonymized in author data, commit data, email data, issue data, and bot data.
+"developer1@dev.org", "message1@dev.org", etc.). Columns that contain a name, e-mail address, message id, or issue title
+are anonymized in author data, commit data, email data, issue data, bot data, and gender data.
 The resulting anonymized data are written to a separate directory "<resdir>_anonymized" (e.g., if <resdir> is
 "threemonth", the anonymized data is written to "threemonth_anonymized").
 """
