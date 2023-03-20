@@ -729,6 +729,10 @@ def fix_characters_in_string(text):
     :return: unicode string
     """
 
+    # do not even try to fix the encoding etc. if there is no text given
+    if text is None:
+        return None
+
     # deal with encoding
     new_text = fix_encoding(text)
 
