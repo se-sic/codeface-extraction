@@ -17,6 +17,7 @@
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018-2019 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # Copyright 2020-2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2023 by Maximilian Löffler <s8maloef@stud.uni-saarland.de>
 # All Rights Reserved.
 """
 This file is able to extract Jira issue data from xml files.
@@ -89,6 +90,13 @@ def run():
     # list for malformed or missing xml-files
     incorrect_files = []
 
+    # list of all processed issues
+    processed_issues = []
+
+    # dict of referenced_by events which need to be inserted into
+    # the issue histories once all issues have been created
+    referenced_bys = {}
+
     # processes every xml-file
     for current_file in file_list:
         # 1) load the list of issues
@@ -98,27 +106,34 @@ def run():
             incorrect_files.append(current_file)
             continue
         # 2) re-format the issues
-        issues = parse_xml(issues, persons, args.skip_history)
+        issues = parse_xml(issues, persons, args.skip_history, referenced_bys)
         # 3) load issue information via api
         if not args.skip_history:
-            load_issue_via_api(issues, persons, __conf["issueTrackerURL"])
-        # 4) update user data with Codeface database
-        #    ATTENTION: As the database update is performed for every iteration in this for loop, but the current issue
-        #    data is appended to the results file immediately, the database updates from the later iterations are not
-        #    respected in the previously dumped issues from the previous iterations. However, as we don't get email
-        #    data from JIRA, this is currently not a problem, as no names will change in the database if we don't
-        #    provide emails. If JIRA will provide email data in the future, this implementation needs to be adjusted
-        #    in such a way that users in issue data of all iterations are updated in the end and dumped afterwards,
-        #    instead of dumping the intermediate issue data immediately.
-        issues = insert_user_data(issues, __conf)
-        # 5) dump result to disk
-        print_to_disk(issues, __resdir)
-        # # 6) export for Gephi
-        # print_to_disk_gephi(issues, __resdir)
-        # # 7) export for jira issue extraction to use them in dev-network-growth
-        # print_to_disk_extr(issues, __resdir)
-        # 8) dump bug issues to disk
-        print_to_disk_bugs(issues, __resdir)
+            load_issues_via_api(issues, persons, __conf["issueTrackerURL"], referenced_bys)
+
+        processed_issues.extend(issues)
+
+    # 4) insert referenced_by events into issue histories
+    for issue_id in referenced_bys.keys():
+        # obtain list of issues which have the current issue id
+        referenced_issue = list(filter(lambda issue: issue["externalId"] == issue_id, processed_issues))
+        if len(referenced_issue) > 0:
+            if len(referenced_issue) > 1:
+                log.warning("Ambiguous issue id " + issue_id + " found in the issue list.")
+            referenced_issue = referenced_issue[0]
+            for referenced_by in referenced_bys[issue_id]:
+                referenced_issue["history"].append(referenced_by)
+
+    # 5) update user data with Codeface database
+    processed_issues = insert_user_data(processed_issues, __conf)
+    # 6) dump result to disk
+    print_to_disk(processed_issues, __resdir)
+    # # 7) export for Gephi
+    # print_to_disk_gephi(processed_issues, __resdir)
+    # # 8) export for jira issue extraction to use them in dev-network-growth
+    # print_to_disk_extr(processed_issues, __resdir)
+    # 9) dump bug issues to disk
+    print_to_disk_bugs(processed_issues, __resdir)
 
     log.info("Jira issue processing complete!")
     log.info("In total, " + str(jira_request_counter) + " requests have been sent to Jira.")
@@ -241,13 +256,14 @@ def merge_user_with_user_from_csv(user, persons):
     return new_user
 
 
-def parse_xml(issue_data, persons, skip_history):
+def parse_xml(issue_data, persons, skip_history, referenced_bys):
     """
     Parse issues from the xml-data.
 
     :param issue_data: list of xml-files
     :param persons: list of persons from JIRA (incl. e-mail addresses), see function "load_csv"
     :param skip_history: flag if the history will be loaded in a different method
+    :param referenced_bys: dict to store all referenced_by events in, which need to be inserted into issues later
     :return: list of parsed issues
     """
 
@@ -324,6 +340,18 @@ def parse_xml(issue_data, persons, skip_history):
 
                 issue["history"].append(history)
 
+                referenced_by = dict()
+                referenced_by["event"] = "referenced_by"
+                referenced_by["author"] = create_user("", "", "")
+                referenced_by["date"] = ""
+                referenced_by["event_info_1"] = issue["externalId"]
+                referenced_by["event_info_2"] = "issue"
+
+                if history["event_info_1"] in referenced_bys:
+                    referenced_bys[history["event_info_1"]].append(referenced_by)
+                else:
+                    referenced_bys[history["event_info_1"]] = [referenced_by]
+
         reporter = issue_x.getElementsByTagName("reporter")[0]
         user = create_user(reporter.firstChild.data, reporter.attributes["username"].value, "")
         issue["author"] = merge_user_with_user_from_csv(user, persons)
@@ -381,13 +409,14 @@ def parse_xml(issue_data, persons, skip_history):
     return issues
 
 
-def load_issue_via_api(issues, persons, url):
+def load_issues_via_api(issues, persons, url, referenced_bys):
     """
     For each issue in the list the history is added via the api.
 
     :param issues: list of issues
     :param persons: list of persons from JIRA (incl. e-mail addresses), see function "load_csv"
     :param url: the project url
+    :param referenced_bys: dict to store all referenced_by events in, which need to be inserted into issues later
     """
 
     log.info("Load issue information via api...")
@@ -502,7 +531,20 @@ def load_issue_via_api(issues, persons, url):
                             history["date"] = format_time(change.created)
                             histories.append(history)
 
+                            referenced_by = dict()
+                            referenced_by["event"] = "referenced_by"
+                            referenced_by["author"] = history["author"]
+                            referenced_by["event_info_1"] = issue["externalId"]
+                            referenced_by["event_info_2"] = "issue"
+                            referenced_by["date"] = history["date"]
+
+                            if history["event_info_1"] in referenced_bys:
+                                referenced_bys[history["event_info_1"]].append(referenced_by)
+                            else:
+                                referenced_bys[history["event_info_1"]] = [referenced_by]
+
                         # remove_link event gets created and added to the issue history
+                        # There might be a referenced_by event here which we do not remove
                         if item.fromString is not None:
                             history = dict()
                             history["event"] = "remove_link"
