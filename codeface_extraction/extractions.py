@@ -15,6 +15,7 @@
 # Copyright 2015-2018 by Claus Hunsen <hunsen@fim.uni-passau.de>
 # Copyright 2016, 2018-2019 by Thomas Bock <bockthom@fim.uni-passau.de>
 # Copyright 2019, 2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2026 by Thomas Bock <bockthom@cmu.edu>
 # Copyright 2018 by Barbara Eckl <ecklbarb@fim.uni-passau.de>
 # Copyright 2018 by Tina Schuh <schuht@fim.uni-passau.de>
 # Copyright 2025 by Maximilian Löffler <s8maloef@stud.uni-saarland.de>
@@ -759,18 +760,15 @@ def fix_name_encoding(name):
     if name is None:
         return name
 
-    # encode utf-8
-    name = name.encode('utf-8')
-
     # find out character set of the encoded name
-    info = decode_header(str(name))
+    info = decode_header(name)
 
     try:
         # Apply correct encoding and return unicode string
         return str(make_header(info))
     except UnicodeDecodeError:
         # Undo utf-8 encoding and return unicode string
-        return str(name.decode('utf-8'))
+        return name
     except LookupError:
         # Encoding not found, return string as is
         return name

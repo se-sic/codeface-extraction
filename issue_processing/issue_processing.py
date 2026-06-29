@@ -18,6 +18,7 @@
 # Copyright 2018-2019 by Anselm Fehnker <fehnker@fim.uni-passau.de>
 # Copyright 2019 by Thomas Bock <bockthom@fim.uni-passau.de>
 # Copyright 2020-2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
+# Copyright 2025-2026 by Leo Sendelbach <s8lesend@stud.uni-saarland.de>
 # Copyright 2026 by Thomas Bock <bockthom@cmu.edu>
 # Copyright 2025 by Maximilian Löffler <s8maloef@stud.uni-saarland.de>
 # All Rights Reserved.
@@ -30,21 +31,24 @@ import json
 import os
 import sys
 from datetime import datetime, timedelta
+import math
 from logging import getLogger
 
 from codeface_utils.cluster.idManager import dbIdManager, csvIdManager
 from codeface_utils.configuration import Configuration
 from codeface_utils.dbmanager import DBManager
+from codeface_utils.util import setup_logging
 from dateutil import parser as dateparser
 
 from csv_writer import csv_writer
+from github_user_utils.github_user_utils import copilot_unified_name
 
 # create logger
 setup_logging()
 log = getLogger(__name__)
 
 # known types from JIRA and GitHub default labels
-known_types = {"bug", "improvement", "enhancement", "new feature", "task", "test", "wish"}
+known_types = {"bug", "improvement", "enhancement", "feature", "task", "test", "wish"}
 
 # known resolutions from JIRA and GitHub default labels
 known_resolutions = {"unresolved", "fixed", "wontfix", "duplicate", "invalid", "incomplete", "cannot reproduce",
@@ -54,6 +58,7 @@ known_resolutions = {"unresolved", "fixed", "wontfix", "duplicate", "invalid", "
 
 # datetime format string
 datetime_format = "%Y-%m-%d %H:%M:%S"
+
 
 def run():
     # get all needed paths and arguments for the method call.
@@ -77,13 +82,14 @@ def run():
     # 1) load the list of issues
     issues = load(__srcdir)
     # 2) re-format the issues
-    issues = reformat_issues(issues)
+    reformat_issues(issues)
     # 3) merges all issue events into one list
-    issues = merge_issue_events(issues)
+    external_connected_events = dict()
+    filtered_connected_events = merge_issue_events(issues, external_connected_events)
     # 4) re-format the eventsList of the issues
-    issues = reformat_events(issues)
+    reformat_events(issues, filtered_connected_events, external_connected_events)
     # 5) update user data with Codeface database and dump username-to-name/e-mail list
-    issues = insert_user_data(issues, __conf, __resdir)
+    insert_user_data(issues, __conf, __resdir)
     # 6) dump result to disk
     print_to_disk(issues, __resdir)
 
@@ -232,7 +238,6 @@ def reformat_issues(issue_data):
     Re-arrange issue data structure.
 
     :param issue_data: the issue data to re-arrange
-    :return: the re-arranged issue data
     """
 
     log.info("Re-arranging Github issues...")
@@ -241,7 +246,10 @@ def reformat_issues(issue_data):
     for issue in issue_data:
 
         # empty container for issue types
-        issue["type"] = []
+        if issue["type"] is None:
+            issue["type"] = []
+        else:
+            issue["type"] = [issue["type"]["name"].lower()]
 
         # empty container for issue resolutions
         issue["resolution"] = []
@@ -258,13 +266,17 @@ def reformat_issues(issue_data):
         if issue["relatedCommits"] is None:
             issue["relatedCommits"] = []
 
-        # if an issue has no reviewsList, an empty Listgets created
+        # if an issue has no reviewsList, an empty List gets created
         if issue["reviewsList"] is None:
             issue["reviewsList"] = []
 
         # if an issue has no relatedIssues, an empty List gets created
-        if "relatedIssues" not in issue:
+        if issue["relatedIssues"] is None:
             issue["relatedIssues"] = []
+
+        # if an issue has no sub-issue list, an empty List gets created
+        if issue["subIssues"] is None:
+            issue["subIssues"] = []
 
         # add "closed_at" information if not present yet
         if issue["closed_at"] is None:
@@ -282,20 +294,22 @@ def reformat_issues(issue_data):
         else:
             issue["type"].append("issue")
 
-    return issue_data
+    return
 
 
-def merge_issue_events(issue_data):
+def merge_issue_events(issue_data, external_connected_events):
     """
     All issue events are merged together in the eventsList. This simplifies processing in later steps.
 
     :param issue_data: the issue data from which the events shall be merged
-    :return: the issue data with merged eventsList
+    :param external_connected_events: a dict to store connected events to external issues
+    :return: a filtered dict of connected events for future reconstruction
     """
 
     log.info("Merge issue events ...")
 
     issue_data_to_update = dict()
+    connected_events = dict()
 
     for issue in issue_data:
 
@@ -364,6 +378,7 @@ def merge_issue_events(issue_data):
             # it is a commit which was added to the pull request
             if rel_commit["type"] == "commitAddedToPullRequest":
                 rel_commit["event"] = "commit_added"
+                rel_commit["event_info_2"] = rel_commit["commit"]["author"]
 
             # if the related commit was mentioned in an issue comment:
             elif rel_commit["type"] == "commitMentionedInIssue":
@@ -479,6 +494,12 @@ def merge_issue_events(issue_data):
             if event["event"] == "review_requested" or event["event"] == "review_request_removed":
                 event["ref_target"] = event["requestedReviewer"]
 
+            # if event is a specific copilot event, assign the copilot user data
+            if event["event"] == "copilot_work_started" or event["event"] == "copilot_work_finished":
+                event["user"]["name"] = None
+                event["user"]["username"] = copilot_unified_name
+                event["user"]["email"] = ""
+
             # if event dismisses a review, we can determine the original state of the corresponding review
             if event["event"] == "review_dismissed":
                 for review in issue["reviewsList"]:
@@ -491,6 +512,36 @@ def merge_issue_events(issue_data):
                 event["ref_target"] = event["user"]
                 event["user"] = event["assigner"]
 
+            # if event is merged event, save the hash of the merge commit in event_info_1
+            if event["event"] == "merged" and not event["commit"] is None:
+                event["event_info_1"] = event["commit"]["hash"]
+
+            # if event is connected event, create or add to a matching dict entry by matching timestamps, for later reconstruction
+            if event["event"] == "connected":
+                if event["created_at"] in list(connected_events.keys()) and connected_events[event["created_at"]]["user"] == event["user"]:
+                    # if there is already a connected event at this time by this user, add this event to the list
+                    connected_events[event["created_at"]]["issues"].append(issue["number"])
+                elif subtract_seconds_from_time(event["created_at"], 1) in list(connected_events.keys()) \
+                        and connected_events[subtract_seconds_from_time(event["created_at"], 1)]["user"] == event["user"]:
+                    # same as above, but accounting for a possible difference in timestamps of 1 second between matching events
+                    connected_events[subtract_seconds_from_time(event["created_at"], 1)]["issues"].append(issue["number"])
+                    event["created_at"] = subtract_seconds_from_time(event["created_at"], 1)
+                elif subtract_seconds_from_time(event["created_at"], -1) in list(connected_events.keys()) \
+                        and connected_events[subtract_seconds_from_time(event["created_at"], -1)]["user"] == event["user"]:
+                    # same as above, with offset calculated in the other direction
+                    connected_events[subtract_seconds_from_time(event["created_at"], -1)]["issues"].append(issue["number"])
+                    event["created_at"] = subtract_seconds_from_time(event["created_at"], -1)
+                else:
+                    # if there is no connected event yet at this timestamp, create a new entry for this event
+                    connected_info = dict()
+                    connected_info["issues"] = [issue["number"]]
+                    connected_info["user"] = event["user"]
+                    connected_events[event["created_at"]] = connected_info
+
+            # if event is a locked event, save the lock reason in event_info_1
+            if event["event"] == "locked":
+                event["event_info_1"] = event["lock_reason"]
+
         # merge events, relatedCommits, relatedIssues and comment lists
         issue["eventsList"] = issue["commentsList"] + issue["eventsList"] + issue["relatedIssues"] + issue[
             "relatedCommits"] + issue["reviewsList"]
@@ -502,21 +553,62 @@ def merge_issue_events(issue_data):
         # sorts eventsList by time
         issue["eventsList"] = sorted(issue["eventsList"], key=lambda k: k["created_at"])
 
+    # filter out connected events which cannot be perfectly matched
+    # and populate external_connected_events dict
+    # because this happens in place, we do not need to return the external_connected_event dict later
+    filtered_connected_events = dict(filter(lambda item: filter_connected_events(item[0], item[1], external_connected_events), connected_events.items()))
+
     # updates all the issues by the temporarily stored referenced_by events
     for _, value in issue_data_to_update.items():
         for issue in issue_data:
             if issue["number"] == value["number"]:
                 issue["eventsList"] = issue["eventsList"] + value["eventsList"]
 
-    return issue_data
+    # return the filtered_connected_events dict for later reconstruction
+    return filtered_connected_events
 
 
-def reformat_events(issue_data):
+def filter_connected_events(key, value, external_connected_events):
+    num_issues = len(value["issues"])
+    # if only a single connected event exists at this time, it has to be connecting to an external issue
+    if num_issues == 1:
+        external_connected_events[key] = value
+        return False
+    # if 2 connected events exist, matching them is trivial
+    if num_issues == 2:
+        return True
+    occurrences = {x: value["issues"].count(x) for x in set(value["issues"])}
+    # otherwise, if it is an even number, check if it can be easily matched,
+    # meaning that exactly half the events occur in the same issue
+    if num_issues % 2 == 0 and num_issues/2 in occurrences.values():
+        # duplicate issue list for matching the issues later
+        value["multi_issues_copy"] = list(value["issues"])
+        return True
+    # if it is an odd number, check if it can be easily matched
+    # meaning that exactly half (rounded up) the events occur in the same issue
+    if num_issues % 2 == 1 and (num_issues + 1)/2 in occurrences.values():
+        for sub_key, sub_value in occurrences.items():
+            # then, assign one of them as an external connected event and proceed as in previous case
+            if sub_value == (num_issues + 1)/2:
+                new_entry = dict()
+                new_entry["user"] = value["user"]
+                new_entry["issues"] = [sub_key]
+                external_connected_events[key] = new_entry
+                value["issues"].remove(sub_key)
+                # duplicate issue list for matching the issues later
+                value["multi_issues_copy"] = list(value["issues"])
+                return True
+    # no other variants can be easily matched
+    return False
+
+
+def reformat_events(issue_data, filtered_connected_events, external_connected_events):
     """
     Re-format event information dependent on the event type.
 
     :param issue_data: the data of all issues that shall be re-formatted
-    :return: the issue data with updated event information
+    :param filtered_connected_events: the dict of connected events which can be reconstructed
+    :param external_connected_events: the dict of connected events to external issues
     """
 
     log.info("Update event information ...")
@@ -541,6 +633,35 @@ def reformat_events(issue_data):
             if event["ref_target"] is not None and not event["ref_target"] == "":
                 users = update_user_dict(users, event["ref_target"])
 
+            # reconstruction of connections
+            if event["event"] == "connected":
+                if event["created_at"] in external_connected_events \
+                    and issue["number"] in external_connected_events[event["created_at"]]["issues"]:
+                    # if the event is an external connected event, mark it as such and remove this issue from the list
+                    event["event_info_1"] = "external"
+                    external_connected_events[event["created_at"]]["issues"].remove(issue["number"])
+                elif event["created_at"] in filtered_connected_events \
+                    and issue["number"] in filtered_connected_events[event["created_at"]]["issues"]:
+                    # if it is instead an internal connected event
+                    value = filtered_connected_events[event["created_at"]]
+                    if len(value["issues"]) == 2:
+                        # and we only have 2 issues in the list, connect to the other issue
+                        event["event_info_1"] = value["issues"][0] if value["issues"][1] == issue["number"] else value["issues"][1]
+                    else:
+                        # and we have more than two issues, count each issue's occurrences
+                        occurrences = {x: value["issues"].count(x) for x in set(value["issues"])}
+                        if occurrences[issue["number"]] == max(occurrences.values()):
+                            # if our issue is the most common one, that means it is the common denominator
+                            # for all connected events at this time
+                            # so this event connects to any other issue
+                            # which is then removed from a copied list to avoid duplications
+                            number = next(x for x in value["multi_issues_copy"] if x != issue["number"])
+                            value["multi_issues_copy"].remove(number)
+                            event["event_info_1"] = number
+                        else:
+                            # otherwise, connect this event to the common denominator
+                            event["event_info_1"] = max(occurrences, key=occurrences.get)
+
     # as the user dictionary is created, start re-formating the event information of all issues
     for issue in issue_data:
 
@@ -558,13 +679,16 @@ def reformat_events(issue_data):
             if event["event"] == "closed":
                 event["event"] = "state_updated"
                 event["event_info_1"] = "closed"  # new state
-                event["event_info_2"] = "open"  # old state
+                if event["commit"] is not None:
+                    event["event_info_2"] = event["commit"]["hash"]
+                else:
+                    event["event_info_2"] = event["state_reason"]
                 issue["state_new"] = "closed"
 
             elif event["event"] == "reopened":
                 event["event"] = "state_updated"
                 event["event_info_1"] = "open"  # new state
-                event["event_info_2"] = "closed"  # old state
+                event["event_info_2"] = event["state_reason"]
                 issue["state_new"] = "reopened"
 
             elif event["event"] == "labeled":
@@ -572,7 +696,7 @@ def reformat_events(issue_data):
                 event["event_info_1"] = label
 
                 # if the label is in this list, it also is a type of the issue
-                if label in known_types:
+                if label in known_types and label not in issue["type"]:
                     issue["type"].append(str(label))
 
                     # creates an event for type updates and adds it to the eventsList
@@ -634,10 +758,14 @@ def reformat_events(issue_data):
                     issue["eventsList"].append(resolution_event)
 
             elif event["event"] == "commented":
-                # "state_new" and "resolution" of the issue give the information about the state and the resolution of
+                # "state_new" of the issue gives the information about the state of
                 # the issue when the comment was written, because the eventsList is sorted by time
                 event["event_info_1"] = issue["state_new"]
-                event["event_info_2"] = issue["resolution"]
+                # if event is a review comment, it can contain suggestions
+                if "contains_suggestion" in event:
+                    event["event_info_2"] = str(event["contains_suggestion"])
+                else:
+                    event["event_info_2"] = str(False)
 
             elif event["event"] == "referenced" and event["commit"] is not None:
                 # remove "referenced" events originating from commits
@@ -651,7 +779,7 @@ def reformat_events(issue_data):
         for event_to_remove in events_to_remove:
             issue["eventsList"].remove(event_to_remove)
 
-    return issue_data
+    return
 
 
 def insert_user_data(issues, conf, resdir):
@@ -662,7 +790,6 @@ def insert_user_data(issues, conf, resdir):
     :param issues: the issues to retrieve user data from
     :param conf: the project configuration
     :param resdir: the directory in which the username-to-user-list should be dumped
-    :return: the updated issue data
     """
 
     log.info("Syncing users with ID service...")
@@ -692,7 +819,7 @@ def insert_user_data(issues, conf, resdir):
 
         # ensure string representation for name and e-mail address
         username = str(user["username"])
-        name = str(user["name"]) if "name" in user else username
+        name = str(user["name"]) if user["name"] is not None else username
         mail = str(user["email"])
 
         # construct string for ID service and send query
@@ -750,6 +877,9 @@ def insert_user_data(issues, conf, resdir):
         for event in issue["eventsList"]:
             event["user"] = get_id_and_update_user(event["user"])
 
+            if event["event"] == "commit_added":
+                event["event_info_2"] = get_id_and_update_user(event["event_info_2"])
+
             # check database for the reference-target user if needed
             if event["ref_target"] != "":
                 event["ref_target"] = get_id_and_update_user(event["ref_target"])
@@ -763,6 +893,10 @@ def insert_user_data(issues, conf, resdir):
         for event in issue["eventsList"]:
             event["user"] = get_user_from_id(event["user"])
 
+            # for commit_added events, save the commit's author's name in event_info_2
+            if event["event"] == "commit_added":
+                event["event_info_2"] = get_user_from_id(event["event_info_2"])["name"]
+
             # get the reference-target user if needed
             if event["ref_target"] != "":
                 event["ref_target"] = get_user_from_id(event["ref_target"])
@@ -773,17 +907,18 @@ def insert_user_data(issues, conf, resdir):
     lines = []
     for username in username_id_buffer:
         user = get_user_from_id(username_id_buffer[username])
-        lines.append((
-            username,
-            user["name"],
-            user["email"]
-        ))
+        if not username == "None":
+            lines.append((
+                username,
+                user["name"],
+                user["email"]
+            ))
 
     log.info("Dump username list to file...")
     username_dump = os.path.join(resdir, "usernames.list")
     csv_writer.write_to_csv(username_dump, sorted(set(lines), key=lambda line: line[0]))
 
-    return issues
+    return
 
 
 def print_to_disk(issues, results_folder):
@@ -810,7 +945,7 @@ def print_to_disk(issues, results_folder):
                 json.dumps(issue["resolution"]),
                 issue["created_at"],
                 issue["closed_at"],
-                json.dumps([]),  # components
+                json.dumps(issue["subIssues"]),  # components
                 event["event"],
                 event["user"]["name"],
                 event["user"]["email"],
