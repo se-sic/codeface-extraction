@@ -34,6 +34,7 @@ from os.path import abspath
 from logging import getLogger
 
 from codeface_utils.configuration import Configuration
+from codeface_utils.util import setup_logging
 from csv_writer import csv_writer
 
 # create logger

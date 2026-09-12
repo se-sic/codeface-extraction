@@ -19,6 +19,8 @@
 # Copyright 2020-2021 by Thomas Bock <bockthom@cs.uni-saarland.de>
 # Copyright 2026 by Thomas Bock <bockthom@cmu.edu>
 # Copyright 2023, 2025 by Maximilian Löffler <s8maloef@stud.uni-saarland.de>
+# Copyright 2025-2026 by Leo Sendelbach <s8lesend@stud.uni-saarland.de>
+# Copyright 2025-2026 by Ritika Hiremath <rihi00002@stud.uni-saarland.de>
 # All Rights Reserved.
 """
 This file is able to extract Jira issue data from xml files.
@@ -37,7 +39,7 @@ from dateutil import parser as dateparser
 from codeface_utils.cluster.idManager import dbIdManager, csvIdManager
 from codeface_utils.configuration import Configuration
 from codeface_utils.dbmanager import DBManager
-
+from codeface_utils.util import setup_logging
 from csv_writer import csv_writer
 
 from jira import JIRA
@@ -128,7 +130,7 @@ def run():
                 referenced_issue["history"].append(referenced_by)
 
     # 5) update user data with Codeface database
-    processed_issues = insert_user_data(processed_issues, __conf)
+    insert_user_data(processed_issues, __conf)
     # 6) dump result to disk
     print_to_disk(processed_issues, __resdir)
     # # 7) export for Gephi
@@ -303,9 +305,12 @@ def parse_xml(issue_data, persons, skip_history, referenced_bys):
         link = issue_x.getElementsByTagName("link")[0]
         issue["url"] = link.firstChild.data
 
-        type = issue_x.getElementsByTagName("type")[0]
-        issue["type"] = type.firstChild.data
-        issue["type_list"] = ["issue", str(type.firstChild.data.lower())]
+        type = issue_x.getElementsByTagName("type")[0].firstChild.data
+        # rename 'new feature' type to 'feature' to be in line with the github original issue type
+        if type == "New Feature":
+            type = "Feature"
+        issue["type"] = type
+        issue["type_list"] = ["issue", str(type.lower())]
 
         status = issue_x.getElementsByTagName("status")[0]
         issue["state"] = status.firstChild.data
@@ -463,21 +468,19 @@ def load_issues_via_api(issues, persons, url, referenced_bys):
             for change in changelog.histories:
 
                 # default values for state and resolution
-                old_state, new_state, old_resolution, new_resolution = "open", "open", "unresolved", "unresolved"
+                new_state, old_resolution, new_resolution = "open", "unresolved", "unresolved"
 
                 # all changes in the issue changelog are checked if they contain a useful information
                 for item in change.items:
 
                     # state_updated event gets created and added to the issue history
                     if item.field == "status":
-                        if item.fromString is not None:
-                            old_state = item.fromString.lower()
                         if item.toString is not None:
                             new_state = item.toString.lower()
                         history = dict()
                         history["event"] = "state_updated"
                         history["event_info_1"] = new_state
-                        history["event_info_2"] = old_state
+                        history["event_info_2"] = ""
                         if hasattr(change, "author"):
                             user = create_user(change.author.displayName, change.author.name, "")
                         else:
@@ -611,7 +614,7 @@ def insert_user_data(issues, conf):
     def get_id_and_update_user(user, buffer_db_ids=user_id_buffer):
 
         # ensure string representation for name and e-mail address
-        name = str(user["name"]) if "name" in user else str(user["username"])
+        name = str(user["name"]) if user["name"] is not None else str(user["username"])
         mail = str(user["email"]) # may be empty
 
         # construct string for ID service and send query
@@ -692,7 +695,7 @@ def insert_user_data(issues, conf):
                 event["event_info_2"] = assigned_user["email"]
 
     log.debug("number of issues after insert_user_data: '{}'".format(len(issues)))
-    return issues
+    return
 
 
 def print_to_disk(issues, results_folder):

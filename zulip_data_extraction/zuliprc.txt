@@ -1,0 +1,4 @@
+[api]
+email=
+key=
+site=https://rust-lang.zulipchat.com

@@ -14,6 +14,7 @@
 # Copyright 2010, 2011 by Wolfgang Mauerer <wm@linux-kernel.net>
 # Copyright 2012, 2013 by Siemens AG, Wolfgang Mauerer <wolfgang.mauerer@siemens.com>
 # Copyright 2025 by Maximilian Löffler <s8maloef@stud.uni-saarland.de>
+# Copyright 2026 by Thomas Bock <bockthom@cmu.edu>
 # All Rights Reserved.
 #
 # The code in this file originates from:
@@ -225,7 +226,7 @@ class dbIdManager(idManager):
                         log.exception("Could not reach ID service. Is the server running?\n")
                         raise
 
-        result = res.read()
+        result = res.read().decode("utf-8")
         jsond = json.loads(result)[0]
 
         return (jsond)
